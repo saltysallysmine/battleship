@@ -65,7 +65,16 @@ class Board:
         self.left = 10
         self.top = 10
         self.cell_size = 30
-        # список размещённых на поле кораблей
+
+        # rows and lines names
+        self.lines_names = {}
+        for i in range(1, 11):
+            self.lines_names[i - 1] = str(i)
+        self.rows_names = {}
+        for i in range(65, 75):
+            self.rows_names[i - 65] = chr(i)
+
+        # list of ships placed on the board
         self.ships = [Ship(decks_number=4)]
 
     # настройка внешнего вида
@@ -74,8 +83,35 @@ class Board:
         self.top = top
         self.cell_size = cell_size
 
+    def rendering_symbol(self, symbol_number, symbol_x, symbol_y, rows=True):
+        if rows:
+            symbol = self.rows_names[symbol_number]
+        else:
+            symbol = self.lines_names[symbol_number]
+
+        font = pygame.font.Font(None, 50)
+        text = font.render(symbol, True, pygame.Color(SHIP_COLOR))
+        text_rect = text.get_rect(center=(symbol_x + self.cell_size // 2,
+                                          symbol_y + self.cell_size // 2))
+        screen.blit(text, text_rect)
+
     # board render
     def render(self):
+
+        # rendering rows names
+        cur_x = self.left
+        cur_y = self.top - self.cell_size
+        for i in range(10):
+            self.rendering_symbol(i, cur_x, cur_y)
+            cur_x += self.cell_size
+
+        # rendering lines names
+        cur_x = self.left - self.cell_size
+        cur_y = self.top
+        for i in range(10):
+            self.rendering_symbol(i, cur_x, cur_y, rows=False)
+            cur_y += self.cell_size
+
         # ships rendering
         for el in self.ships:
             el.ship_render(self.board)
