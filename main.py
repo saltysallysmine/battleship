@@ -75,7 +75,11 @@ class Board:
             self.rows_names[i - 65] = chr(i)
 
         # list of ships placed on the board
-        self.ships = [Ship(decks_number=4)]
+        self.ships = list()
+
+    # add ship function
+    def add_ship(self, decks_number):
+        self.ships.append(Ship(decks_number=decks_number))
 
     # настройка внешнего вида
     def set_view(self, left, top, cell_size):
@@ -89,7 +93,7 @@ class Board:
         else:
             symbol = self.lines_names[symbol_number]
 
-        font = pygame.font.Font(None, 50)
+        font = pygame.font.Font(None, self.cell_size)
         text = font.render(symbol, True, pygame.Color(SHIP_COLOR))
         text_rect = text.get_rect(center=(symbol_x + self.cell_size // 2,
                                           symbol_y + self.cell_size // 2))
@@ -161,6 +165,9 @@ if __name__ == "__main__":
     screen = pygame.display.set_mode(size)
     player_board = Board(10, 10)
     player_board.set_view(80, 80, 50)
+
+    # test ship
+    player_board.add_ship(5)
 
     running = True
     while running:
