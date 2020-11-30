@@ -6,6 +6,10 @@ BORDERS_COLOR = 'white'
 SHIP_COLOR = 'orange'
 EMPTY_CELL_COLOR = 'grey'
 INJURED_COLOR = 'red'
+TEXT_COLOR = (255, 100, 0)
+BUTTON_COLOR = (160, 214, 180)
+FOCUSED_BUTTON_COLOR = (113, 188, 120)
+PUSHED_BUTTON_COLOR = (181, 101, 167)
 
 
 class Ship:
@@ -46,6 +50,52 @@ class Ship:
 
             board_list[el['deck_i']][el['deck_j']][
                 'cell_ship_number'] = self.ship_number
+
+
+class ChooseShipButton:
+    def __init__(self, head, btn_size, text):
+        self.head = self.head_x, self.head_y = head
+        self.size = self.width, self.height = btn_size
+        self.text = text
+        self.btn_color = BUTTON_COLOR
+        self.border_color = BORDERS_COLOR
+
+    # rendering button
+    def btn_render(self):
+        # button
+        pygame.draw.rect(screen, pygame.Color(self.border_color),
+                         (self.head, self.size), 3, border_radius=10)
+
+        pygame.draw.rect(screen, pygame.Color(self.btn_color),
+                         (self.head_x + 3, self.head_y + 3,
+                          self.width - 6, self.height - 6), 0,
+                         border_radius=5)
+
+        # text
+        font = pygame.font.Font(None, 50)
+        text = font.render(self.text, True, pygame.Color(TEXT_COLOR))
+        text_rect = text.get_rect(center=(self.head_x + self.width // 2,
+                                          self.head_y + self.height // 2))
+        screen.blit(text, text_rect)
+
+    def is_focused(self, cur_pos):
+        return 0 < cur_pos[0] - self.head_x < self.width \
+               and 0 < cur_pos[1] - self.head_y < self.height
+
+    def get_motion(self, cur_pos):
+        if self.is_focused(cur_pos):
+            self.btn_color = FOCUSED_BUTTON_COLOR
+        else:
+            self.btn_color = BUTTON_COLOR
+
+    # add ship to board
+    def button_pushed(self, cur_pos):
+        if self.is_focused(cur_pos):
+            self.btn_color = PUSHED_BUTTON_COLOR
+
+    def button_unpushed(self, cur_pos):
+        if self.is_focused(cur_pos):
+            self.btn_color = FOCUSED_BUTTON_COLOR
 
 
 class Board:
@@ -101,6 +151,10 @@ class Board:
 
     # board render
     def render(self):
+        # rendering choose ship buttons
+        if ship_placement_stage:
+            for el in choose_ship_btns:
+                el.btn_render()
 
         # rendering rows names
         cur_x = self.left
@@ -166,8 +220,21 @@ if __name__ == "__main__":
     player_board = Board(10, 10)
     player_board.set_view(80, 80, 50)
 
+    # ship placement stage
+    ship_placement_stage = True
+
+    # test items
     # test ship
     player_board.add_ship(5)
+
+    # choose ship buttons rendering
+    choose_ship_btns = list()
+    for i in range(1, 5):
+        choose_ship_btns.append(
+            ChooseShipButton((player_board.left + (i - 1) * 125,
+                              player_board.top +
+                              player_board.cell_size * 10 + 15),
+                             (125, 80), f'x{i}'))
 
     running = True
     while running:
@@ -175,8 +242,25 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
+            if event.type == pygame.MOUSEMOTION:
+                # choose btns
+                if ship_placement_stage:
+                    for el in choose_ship_btns:
+                        el.get_motion(event.pos)
+
             if event.type == pygame.MOUSEBUTTONDOWN:
-                player_board.get_click(event.pos)
+                # choose btns
+                if ship_placement_stage:
+                    for el in choose_ship_btns:
+                        el.button_pushed(event.pos)
+                # player_board.get_click(event.pos)
+
+            if event.type == pygame.MOUSEBUTTONUP:
+                # choose btns
+                if ship_placement_stage:
+                    for el in choose_ship_btns:
+                        el.button_unpushed(event.pos)
 
         # screen updating
         screen.fill(BACKGROUND_COLOR)
