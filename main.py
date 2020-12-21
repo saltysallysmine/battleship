@@ -12,6 +12,31 @@ FOCUSED_BUTTON_COLOR = (113, 188, 120)
 PUSHED_BUTTON_COLOR = (181, 101, 167)
 
 
+class Deck:
+    def __init__(self, cur_i, cur_j, injured=False):
+        self.deck_i = cur_i
+        self.deck_j = cur_j
+        self.injured = injured
+
+    def get_cords(self):
+        return self.deck_i, self.deck_j
+
+    def get_i(self):
+        return self.deck_i
+
+    def get_j(self):
+        return self.deck_j
+
+    def is_injured(self):
+        return self.injured
+
+    def set_injured(self, injured):
+        self.injured = injured
+
+    def set_cords(self, cords):
+        self.deck_i, self.deck_j = cords
+
+
 class Ship:
     def __init__(self, decks_number=1, head_pos=(0, 0), horizontal=True, ship_number=0):
         # число палуб
@@ -31,24 +56,22 @@ class Ship:
     def decks_list_filling(self):
         cur_i, cur_j = self.head_pos
         for _ in range(self.decks_number):
-            self.decks.append({'deck_i': cur_i,
-                               'deck_j': cur_j,
-                               'deck_injured': False})
+            self.decks.append(Deck(cur_i, cur_j))
             if self.horizontal:
                 cur_j += 1
             else:
                 cur_i += 1
 
     def ship_render(self, board_list):
-        for el in self.decks:
-            if not el['deck_injured']:
-                board_list[el['deck_i']][
-                    el['deck_j']]['cell_color'] = SHIP_COLOR
+        for deck in self.decks:
+            if not deck.is_injured():
+                board_list[deck.get_i()][deck.get_j()][
+                    'cell_color'] = SHIP_COLOR
             else:
-                board_list[el['deck_i']][
-                    el['deck_j']]['cell_color'] = INJURED_COLOR
+                board_list[deck.get_j()][deck.get_j()][
+                    'cell_color'] = INJURED_COLOR
 
-            board_list[el['deck_i']][el['deck_j']][
+            board_list[deck.get_i()][deck.get_j()][
                 'cell_ship_number'] = self.ship_number
 
 
