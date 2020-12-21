@@ -12,6 +12,24 @@ FOCUSED_BUTTON_COLOR = (113, 188, 120)
 PUSHED_BUTTON_COLOR = (181, 101, 167)
 
 
+class BoardCell:
+    def __init__(self, color):
+        self.color = color
+        self.cell_ship_number = None
+
+    def get_cell_color(self):
+        return self.color
+
+    def get_cell_ship_number(self):
+        return self.cell_ship_number
+
+    def set_cell_color(self, color):
+        self.color = color
+
+    def set_cell_ship_number(self, cell_ship_number):
+        self.cell_ship_number = cell_ship_number
+
+
 class Deck:
     def __init__(self, cur_i, cur_j, injured=False):
         self.deck_i = cur_i
@@ -33,7 +51,7 @@ class Deck:
     def set_injured(self, injured):
         self.injured = injured
 
-    def set_cords(self, cords):
+    def set_cords(self, *cords):
         self.deck_i, self.deck_j = cords
 
 
@@ -49,14 +67,23 @@ class Ship:
         self.alive = True
         # номер корабля в списке board
         self.ship_number = ship_number
+        # для заполнения информации о палубах корабля
+        self.new_ship = True
         # палубы со значением их целостности
         self.decks = list()
         self.decks_list_filling()
 
     def decks_list_filling(self):
+        # new ship or not
+        if self.decks:
+            self.new_ship = False
+        # filling
         cur_i, cur_j = self.head_pos
         for _ in range(self.decks_number):
-            self.decks.append(Deck(cur_i, cur_j))
+            if self.new_ship:
+                self.decks.append(Deck(cur_i, cur_j))
+            else:
+                self.decks[_].set_cords(cur_i, cur_j)
             if self.horizontal:
                 cur_j += 1
             else:
@@ -65,14 +92,11 @@ class Ship:
     def ship_render(self, board_list):
         for deck in self.decks:
             if not deck.is_injured():
-                board_list[deck.get_i()][deck.get_j()][
-                    'cell_color'] = SHIP_COLOR
+                board_list[deck.get_i()][deck.get_j()].set_cell_color(SHIP_COLOR)
             else:
-                board_list[deck.get_j()][deck.get_j()][
-                    'cell_color'] = INJURED_COLOR
+                board_list[deck.get_j()][deck.get_j()].set_cell_color(INJURED_COLOR)
 
-            board_list[deck.get_i()][deck.get_j()][
-                'cell_ship_number'] = self.ship_number
+            board_list[deck.get_i()][deck.get_j()].set_cell_ship_number(self.ship_number)
 
 
 class ChooseShipButton:
@@ -130,8 +154,7 @@ class Board:
         # list of boards cells values
         self.board = list()
         for _ in range(board_height):
-            self.board.append([{'cell_color': EMPTY_CELL_COLOR,
-                                'cell_ship_number': None}
+            self.board.append([BoardCell(EMPTY_CELL_COLOR)
                                for nn in range(board_width)])
 
         # значения по умолчанию
@@ -149,6 +172,10 @@ class Board:
 
         # list of ships placed on the board
         self.ships = list()
+
+        # the last highlighted cell info
+        self.last_highlighted_cell_color = EMPTY_CELL_COLOR
+        self.last_highlighted_cell_cords = (-1, -1)
 
     # add ship function
     def add_ship(self, decks_number):
@@ -176,8 +203,8 @@ class Board:
     def render(self):
         # rendering choose ship buttons
         if ship_placement_stage:
-            for el in choose_ship_btns:
-                el.btn_render()
+            for btn in choose_ship_btns:
+                btn.btn_render()
 
         # rendering rows names
         cur_x = self.left
@@ -185,7 +212,6 @@ class Board:
         for i in range(10):
             self.rendering_symbol(i, cur_x, cur_y)
             cur_x += self.cell_size
-
         # rendering lines names
         cur_x = self.left - self.cell_size
         cur_y = self.top
@@ -194,8 +220,8 @@ class Board:
             cur_y += self.cell_size
 
         # ships rendering
-        for el in self.ships:
-            el.ship_render(self.board)
+        for ship in self.ships:
+            ship.ship_render(self.board)
 
         # board cells filling
         for i in range(self.height):
@@ -208,7 +234,7 @@ class Board:
                                   self.cell_size, self.cell_size), 3,
                                  border_radius=8)
 
-                cur_color = self.board[i][j]['cell_color']
+                cur_color = self.board[i][j].get_cell_color()
                 pygame.draw.rect(screen, pygame.Color(cur_color),
                                  (cur_cell_x + 3, cur_cell_y + 3,
                                   self.cell_size - 6, self.cell_size - 6), 0,
@@ -225,14 +251,31 @@ class Board:
 
     def on_click(self, cell_coords):
         if cell_coords:
-            if self.board[cell_coords[0]][cell_coords[1]]['cell_color'] == EMPTY_CELL_COLOR:
-                self.board[cell_coords[0]][cell_coords[1]]['cell_color'] = SHIP_COLOR
+            if self.board[cell_coords[0]][cell_coords[1]].get_cell_color() == EMPTY_CELL_COLOR:
+                self.board[cell_coords[0]][cell_coords[1]].set_cell_color(SHIP_COLOR)
             else:
-                self.board[cell_coords[0]][cell_coords[1]]['cell_color'] = EMPTY_CELL_COLOR
+                self.board[cell_coords[0]][cell_coords[1]].set_cell_color(EMPTY_CELL_COLOR)
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
         self.on_click(cell)
+
+    def cell_highlighting(self, mouse_pos):
+        cell = self.get_cell(mouse_pos)
+        if cell and cell != self.last_highlighted_cell_cords:
+            cur_color = pygame.Color(self.board[cell[0]][cell[1]].get_cell_color())
+            # last cell reset
+            reset_i, reset_j = self.last_highlighted_cell_cords
+            if reset_i != -1:
+                old_color = tuple(self.last_highlighted_cell_color)
+                self.board[reset_i][reset_j].set_cell_color(old_color)
+            # last cell info update
+            self.last_highlighted_cell_cords = cell
+            self.last_highlighted_cell_color = tuple(cur_color)
+            hsv = cur_color.hsva
+            # увеличиваем параметр Value, который влияет на яркость
+            cur_color.hsva = (hsv[0], hsv[1], min(100.0, hsv[2] + 10), hsv[3])
+            self.board[cell[0]][cell[1]].set_cell_color(cur_color)
 
 
 if __name__ == "__main__":
@@ -259,6 +302,10 @@ if __name__ == "__main__":
                               player_board.cell_size * 10 + 15),
                              (125, 80), f'x{i}'))
 
+    # fps
+    fps = 60
+    clock = pygame.time.Clock()
+
     running = True
     while running:
         # checking events
@@ -271,6 +318,8 @@ if __name__ == "__main__":
                 if ship_placement_stage:
                     for el in choose_ship_btns:
                         el.get_motion(event.pos)
+                # board cells highlighting
+                player_board.cell_highlighting(event.pos)
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 # choose btns
@@ -290,6 +339,9 @@ if __name__ == "__main__":
         player_board.render()
         # screen flip
         pygame.display.flip()
+
+        # delay for constant fps
+        clock.tick(fps)
 
     # game ending
     pygame.quit()
