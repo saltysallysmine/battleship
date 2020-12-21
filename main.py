@@ -21,11 +21,11 @@ class BoardCell:
     def get_cell_color(self):
         return self.color
 
-    def get_cell_ship_number(self):
-        return self.cell_ship_number
-
     def set_cell_color(self, color):
         self.color = color
+
+    def get_cell_ship_number(self):
+        return self.cell_ship_number
 
     def set_cell_ship_number(self, cell_ship_number):
         self.cell_ship_number = cell_ship_number
@@ -73,6 +73,8 @@ class Ship:
         # палубы со значением их целостности
         self.decks = list()
         self.decks_list_filling()
+        # placed
+        self.placed = False
 
     def decks_list_filling(self):
         # new ship or not
@@ -106,7 +108,67 @@ class Ship:
         self.head_pos = new_pos
         self.decks_list_filling()
 
-    def place_is_ok(self):
+    def place_is_ok(self, cur_board):
+        board_list = cur_board.board
+        cur_i, cur_j = self.head_pos
+        cur_height, cur_width = cur_board.get_size()
+        for x in range(self.decks_number):
+            # current cell
+            if board_list[cur_i][cur_j].get_cell_ship_number() is not None:
+                return False
+            # corners
+            if cur_i != 0 and cur_j != 0:
+                if board_list[cur_i - 1][cur_j - 1].get_cell_ship_number() is not None:
+                    return False
+            if cur_i != 0 and cur_j != cur_width - 1:
+                if board_list[cur_i - 1][cur_j + 1].get_cell_ship_number() is not None:
+                    return False
+            if cur_i != cur_height - 1 and cur_j != 0:
+                if board_list[cur_i + 1][cur_j - 1].get_cell_ship_number() is not None:
+                    return False
+            if cur_i != cur_height - 1 and cur_j != cur_width - 1:
+                if board_list[cur_i + 1][cur_j + 1].get_cell_ship_number() is not None:
+                    return False
+            # other cells
+            if self.horizontal:
+                # tail or nose
+                if x == 0:
+                    if cur_j != 0:
+                        if board_list[cur_i][cur_j - 1].get_cell_ship_number() is not None:
+                            return False
+                if x == self.decks_number - 1:
+                    if cur_j != cur_width - 1:
+                        if board_list[cur_i][cur_j + 1].get_cell_ship_number() is not None:
+                            return False
+                # all decks
+                if cur_i < cur_height - 1:
+                    if board_list[cur_i + 1][cur_j].get_cell_ship_number() is not None:
+                        return False
+                if cur_i > 0:
+                    if board_list[cur_i - 1][cur_j].get_cell_ship_number() is not None:
+                        return False
+                # index growing
+                cur_j += 1
+            else:
+                # tail or nose
+                if x == 0:
+                    if cur_i != 0:
+                        if board_list[cur_i - 1][cur_j].get_cell_ship_number() is not None:
+                            return False
+                if x == self.decks_number - 1:
+                    if cur_i != cur_height - 1:
+                        if board_list[cur_i + 1][cur_j].get_cell_ship_number() is not None:
+                            return False
+                # all decks
+                if cur_j < cur_width - 1:
+                    if board_list[cur_i][cur_j + 1].get_cell_ship_number() is not None:
+                        return False
+                if cur_j > 0:
+                    if board_list[cur_i][cur_j - 1].get_cell_ship_number() is not None:
+                        return False
+                # index growing
+                cur_i += 1
+        self.placed = True
         return True
 
     def ship_render(self, board_list):
@@ -115,8 +177,8 @@ class Ship:
                 board_list[deck.get_i()][deck.get_j()].set_cell_color(SHIP_COLOR)
             else:
                 board_list[deck.get_j()][deck.get_j()].set_cell_color(INJURED_COLOR)
-
-            board_list[deck.get_i()][deck.get_j()].set_cell_ship_number(self.ship_number)
+            if self.placed:
+                board_list[deck.get_i()][deck.get_j()].set_cell_ship_number(self.ship_number)
 
 
 class ChooseShipButton:
@@ -233,7 +295,7 @@ class Board:
         self.cell_size = cell_size
 
     def get_size(self):
-        return self.width, self.height
+        return self.height, self.width
 
     def rendering_symbol(self, symbol_number, symbol_x, symbol_y, rows=True):
         if rows:
@@ -403,7 +465,7 @@ if __name__ == "__main__":
                         player_board.ships[-1].change_horizontal()
                 if event.key == 13:
                     if player_board.placing_ship:
-                        if player_board.ships[-1].place_is_ok():
+                        if player_board.ships[-1].place_is_ok(player_board):
                             player_board.placing_ship = False
 
         # screen updating
