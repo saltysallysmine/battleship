@@ -5,6 +5,7 @@ BACKGROUND_COLOR = (28, 28, 28)
 BORDERS_COLOR = 'white'
 SHIP_COLOR = 'orange'
 EMPTY_CELL_COLOR = 'grey'
+INACTIVE_CELL_COLOR = 'grey'
 INJURED_COLOR = 'red'
 TEXT_COLOR = (255, 100, 0)
 BUTTON_COLOR = (160, 214, 180)
@@ -105,6 +106,9 @@ class Ship:
         self.head_pos = new_pos
         self.decks_list_filling()
 
+    def place_is_ok(self):
+        return True
+
     def ship_render(self, board_list):
         for deck in self.decks:
             if not deck.is_injured():
@@ -122,6 +126,9 @@ class ChooseShipButton:
         self.text = text
         self.btn_color = BUTTON_COLOR
         self.border_color = BORDERS_COLOR
+
+        # allowed ship number
+        self.allowed_ship_number = 5 - int(self.text[1:])
 
     # rendering button
     def btn_render(self):
@@ -146,15 +153,16 @@ class ChooseShipButton:
                and 0 < cur_pos[1] - self.head_y < self.height
 
     def get_motion(self, cur_pos):
-        if self.is_focused(cur_pos):
-            self.btn_color = FOCUSED_BUTTON_COLOR
-        else:
-            self.btn_color = BUTTON_COLOR
+        if self.allowed_ship_number:
+            if self.is_focused(cur_pos):
+                self.btn_color = FOCUSED_BUTTON_COLOR
+            else:
+                self.btn_color = BUTTON_COLOR
 
     # add ship to board
     def button_pushed(self, cur_pos, cur_board):
         if self.is_focused(cur_pos):
-            if not cur_board.placing_ship:
+            if not cur_board.placing_ship and self.allowed_ship_number:
                 # update color
                 self.btn_color = PUSHED_BUTTON_COLOR
                 # create new ship
@@ -162,9 +170,13 @@ class ChooseShipButton:
                 new_decks_number = int(self.text[1:])
                 cur_board.add_ship(Ship(decks_number=new_decks_number,
                                         head_pos=(h_pos[0] - 1, 0)))
+                # allowed ship number updating
+                self.allowed_ship_number = max(0, self.allowed_ship_number - 1)
+                if not self.allowed_ship_number:
+                    self.btn_color = INACTIVE_CELL_COLOR
 
     def button_unpushed(self, cur_pos):
-        if self.is_focused(cur_pos):
+        if self.is_focused(cur_pos) and self.allowed_ship_number:
             self.btn_color = FOCUSED_BUTTON_COLOR
 
 
@@ -239,8 +251,9 @@ class Board:
     def render(self):
         # rendering choose ship buttons
         if ship_placement_stage:
-            self.board = list()
-            self.board_filling()
+            if self.placing_ship:
+                self.board = list()
+                self.board_filling()
             for btn in choose_ship_btns:
                 btn.btn_render()
 
