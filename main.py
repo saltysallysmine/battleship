@@ -95,8 +95,15 @@ class Ship:
     def is_horizontal(self):
         return self.horizontal
 
-    def change_horizontal(self):
-        self.horizontal = not self.horizontal
+    def change_horizontal(self, cur_board):
+        if not self.horizontal:
+            if self.head_pos[1] + self.decks_number - 1 < cur_board.width:
+                self.horizontal = not self.horizontal
+                self.decks_list_filling()
+        else:
+            if self.head_pos[0] + self.decks_number - 1 < cur_board.height:
+                self.horizontal = not self.horizontal
+                self.decks_list_filling()
 
     def get_size(self):
         return len(self.decks)
@@ -460,11 +467,10 @@ if __name__ == "__main__":
                         el.button_unpushed(event.pos)
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    if player_board.placing_ship:
-                        player_board.ships[-1].change_horizontal()
-                if event.key == 13:
-                    if player_board.placing_ship:
+                if player_board.placing_ship:
+                    if event.key == pygame.K_SPACE:
+                        player_board.ships[-1].change_horizontal(player_board)
+                    if event.key == 13:
                         if player_board.ships[-1].place_is_ok(player_board):
                             player_board.placing_ship = False
 
