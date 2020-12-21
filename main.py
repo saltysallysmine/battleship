@@ -283,6 +283,9 @@ class Board:
         # new ship placing flag
         self.placing_ship = False
 
+        # required number of ships
+        self.need_to_place_ships = 10
+
     # add ship function
     def add_ship(self, new_ship):
         self.ships.append(new_ship)
@@ -294,6 +297,17 @@ class Board:
         for _ in range(self.height):
             self.board.append([BoardCell(EMPTY_CELL_COLOR)
                                for nn in range(self.width)])
+
+    def reduce_required_number_of_ships(self):
+        self.need_to_place_ships -= 1
+        if not self.need_to_place_ships:
+            # game status
+            global ship_placement_stage, battle_begins_table_need
+            ship_placement_stage = False
+            battle_begins_table_need = True
+            # btn delete
+            global choose_ship_btns
+            choose_ship_btns.clear()
 
     # настройка внешнего вида
     def set_view(self, left, top, cell_size):
@@ -409,6 +423,20 @@ class Board:
                 self.ships[-1].set_head_pos((new_head_i, new_head_j))
 
 
+def battle_begins_table_render():
+    # render table
+    table_text = 'The battle begins'
+    font = pygame.font.Font(None, 50)
+    text = font.render(table_text, True, (100, 255, 100))
+    text_x = player_board.left + 115
+    text_y = player_board.top + player_board.cell_size * player_board.height + 15
+    text_w = text.get_width()
+    text_h = text.get_height()
+    screen.blit(text, (text_x, text_y))
+    pygame.draw.rect(screen, PUSHED_BUTTON_COLOR, (text_x - 10, text_y - 10,
+                                                   text_w + 20, text_h + 20), 1)
+
+
 if __name__ == "__main__":
     pygame.init()
     pygame.display.set_caption('Battleship')
@@ -419,6 +447,8 @@ if __name__ == "__main__":
 
     # ship placement stage
     ship_placement_stage = True
+    # start game flag
+    battle_begins_table_need = False
 
     # test items
     # test ship
@@ -468,17 +498,28 @@ if __name__ == "__main__":
 
             if event.type == pygame.KEYDOWN:
                 if player_board.placing_ship:
+                    # space pressing
                     if event.key == pygame.K_SPACE:
                         player_board.ships[-1].change_horizontal(player_board)
+                    # enter pressing
                     if event.key == 13:
                         if player_board.ships[-1].place_is_ok(player_board):
                             player_board.placing_ship = False
+                            player_board.reduce_required_number_of_ships()
 
         # screen updating
         screen.fill(BACKGROUND_COLOR)
+        # boards ands btns
         player_board.render()
+        # battle begins table
+        if battle_begins_table_need:
+            battle_begins_table_render()
         # screen flip
         pygame.display.flip()
+        # battle begins table delete
+        if battle_begins_table_need:
+            battle_begins_table_need = False
+            pygame.time.wait(3000)
 
         # delay for constant fps
         clock.tick(fps)
