@@ -79,15 +79,31 @@ class Ship:
             self.new_ship = False
         # filling
         cur_i, cur_j = self.head_pos
-        for _ in range(self.decks_number):
+        for x in range(self.decks_number):
             if self.new_ship:
                 self.decks.append(Deck(cur_i, cur_j))
             else:
-                self.decks[_].set_cords(cur_i, cur_j)
+                self.decks[x].set_cords(cur_i, cur_j)
             if self.horizontal:
                 cur_j += 1
             else:
                 cur_i += 1
+
+    def is_horizontal(self):
+        return self.horizontal
+
+    def change_horizontal(self):
+        self.horizontal = not self.horizontal
+
+    def get_size(self):
+        return len(self.decks)
+
+    def set_number(self, numb):
+        self.ship_number = numb
+
+    def set_head_pos(self, new_pos):
+        self.head_pos = new_pos
+        self.decks_list_filling()
 
     def ship_render(self, board_list):
         for deck in self.decks:
@@ -136,9 +152,16 @@ class ChooseShipButton:
             self.btn_color = BUTTON_COLOR
 
     # add ship to board
-    def button_pushed(self, cur_pos):
+    def button_pushed(self, cur_pos, cur_board):
         if self.is_focused(cur_pos):
-            self.btn_color = PUSHED_BUTTON_COLOR
+            if not cur_board.placing_ship:
+                # update color
+                self.btn_color = PUSHED_BUTTON_COLOR
+                # create new ship
+                h_pos = cur_board.get_size()
+                new_decks_number = int(self.text[1:])
+                cur_board.add_ship(Ship(decks_number=new_decks_number,
+                                        head_pos=(h_pos[0] - 1, 0)))
 
     def button_unpushed(self, cur_pos):
         if self.is_focused(cur_pos):
@@ -153,9 +176,8 @@ class Board:
         self.height = board_height
         # list of boards cells values
         self.board = list()
-        for _ in range(board_height):
-            self.board.append([BoardCell(EMPTY_CELL_COLOR)
-                               for nn in range(board_width)])
+        # board filling
+        self.board_filling()
 
         # значения по умолчанию
         self.left = 10
@@ -177,15 +199,29 @@ class Board:
         self.last_highlighted_cell_color = EMPTY_CELL_COLOR
         self.last_highlighted_cell_cords = (-1, -1)
 
+        # new ship placing flag
+        self.placing_ship = False
+
     # add ship function
-    def add_ship(self, decks_number):
-        self.ships.append(Ship(decks_number=decks_number))
+    def add_ship(self, new_ship):
+        self.ships.append(new_ship)
+        self.ships[-1].set_number(len(self.ships) - 1)
+        self.placing_ship = True
+
+    # board filling
+    def board_filling(self):
+        for _ in range(self.height):
+            self.board.append([BoardCell(EMPTY_CELL_COLOR)
+                               for nn in range(self.width)])
 
     # настройка внешнего вида
     def set_view(self, left, top, cell_size):
         self.left = left
         self.top = top
         self.cell_size = cell_size
+
+    def get_size(self):
+        return self.width, self.height
 
     def rendering_symbol(self, symbol_number, symbol_x, symbol_y, rows=True):
         if rows:
@@ -203,6 +239,8 @@ class Board:
     def render(self):
         # rendering choose ship buttons
         if ship_placement_stage:
+            self.board = list()
+            self.board_filling()
             for btn in choose_ship_btns:
                 btn.btn_render()
 
@@ -277,6 +315,17 @@ class Board:
             cur_color.hsva = (hsv[0], hsv[1], min(100.0, hsv[2] + 10), hsv[3])
             self.board[cell[0]][cell[1]].set_cell_color(cur_color)
 
+    def get_move(self, cur_pos):
+        if self.placing_ship:
+            if self.get_cell(cur_pos):
+                new_head_i, new_head_j = self.get_cell(cur_pos)
+                if self.ships[-1].is_horizontal():
+                    new_head_j = min(self.width - self.ships[-1].get_size(), new_head_j)
+                else:
+                    new_head_i = min(self.height - self.ships[-1].get_size(), new_head_i)
+                # set new head position
+                self.ships[-1].set_head_pos((new_head_i, new_head_j))
+
 
 if __name__ == "__main__":
     pygame.init()
@@ -291,7 +340,7 @@ if __name__ == "__main__":
 
     # test items
     # test ship
-    player_board.add_ship(5)
+    # player_board.add_ship(Ship(decks_number=3))
 
     # choose ship buttons rendering
     choose_ship_btns = list()
@@ -316,8 +365,9 @@ if __name__ == "__main__":
             if event.type == pygame.MOUSEMOTION:
                 # choose btns
                 if ship_placement_stage:
-                    for el in choose_ship_btns:
-                        el.get_motion(event.pos)
+                    for btns in choose_ship_btns:
+                        btns.get_motion(event.pos)
+                    player_board.get_move(event.pos)
                 # board cells highlighting
                 player_board.cell_highlighting(event.pos)
 
@@ -325,7 +375,7 @@ if __name__ == "__main__":
                 # choose btns
                 if ship_placement_stage:
                     for el in choose_ship_btns:
-                        el.button_pushed(event.pos)
+                        el.button_pushed(event.pos, player_board)
                 # player_board.get_click(event.pos)
 
             if event.type == pygame.MOUSEBUTTONUP:
@@ -333,6 +383,15 @@ if __name__ == "__main__":
                 if ship_placement_stage:
                     for el in choose_ship_btns:
                         el.button_unpushed(event.pos)
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    if player_board.placing_ship:
+                        player_board.ships[-1].change_horizontal()
+                if event.key == 13:
+                    if player_board.placing_ship:
+                        if player_board.ships[-1].place_is_ok():
+                            player_board.placing_ship = False
 
         # screen updating
         screen.fill(BACKGROUND_COLOR)
