@@ -1,4 +1,5 @@
 import pygame
+from random import randint, randrange
 from pprint import pprint as write
 
 BACKGROUND_COLOR = (28, 28, 28)
@@ -60,9 +61,9 @@ class Ship:
     def __init__(self, decks_number=1, head_pos=(0, 0), horizontal=True, ship_number=0):
         # число палуб
         self.decks_number = decks_number
-        # позиция головы
-        self.head_pos = self.head_i, self.head_j = head_pos
         # горизонтальный / вертикальный
+        # maybe head
+        self.head_pos = head_pos
         self.horizontal = horizontal
         # статус корабля
         self.alive = True
@@ -75,6 +76,11 @@ class Ship:
         self.decks_list_filling()
         # placed
         self.placed = False
+        # позиция головы
+        self.set_head_pos(head_pos)
+
+    def is_horizontal(self):
+        return self.horizontal
 
     def decks_list_filling(self):
         # new ship or not
@@ -91,9 +97,6 @@ class Ship:
                 cur_j += 1
             else:
                 cur_i += 1
-
-    def is_horizontal(self):
-        return self.horizontal
 
     def change_horizontal(self, cur_board):
         if not self.horizontal:
@@ -112,7 +115,13 @@ class Ship:
         self.ship_number = numb
 
     def set_head_pos(self, new_pos):
-        self.head_pos = new_pos
+        new_head_i, new_head_j = new_pos
+        cur_height, cur_width = 10, 10
+        if self.is_horizontal():
+            new_head_j = min(cur_width - self.get_size(), new_head_j)
+        else:
+            new_head_i = min(cur_height - self.get_size(), new_head_i)
+        self.head_pos = new_head_i, new_head_j
         self.decks_list_filling()
 
     def place_is_ok(self, cur_board):
@@ -396,13 +405,13 @@ class Board:
 
     def cell_highlighting(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
+        # last cell reset
+        reset_i, reset_j = self.last_highlighted_cell_cords
+        if reset_i != -1:
+            old_color = tuple(self.last_highlighted_cell_color)
+            self.board[reset_i][reset_j].set_cell_color(old_color)
         if cell and cell != self.last_highlighted_cell_cords:
             cur_color = pygame.Color(self.board[cell[0]][cell[1]].get_cell_color())
-            # last cell reset
-            reset_i, reset_j = self.last_highlighted_cell_cords
-            if reset_i != -1:
-                old_color = tuple(self.last_highlighted_cell_color)
-                self.board[reset_i][reset_j].set_cell_color(old_color)
             # last cell info update
             self.last_highlighted_cell_cords = cell
             self.last_highlighted_cell_color = tuple(cur_color)
@@ -437,6 +446,29 @@ def battle_begins_table_render():
                                                    text_w + 20, text_h + 20), 1)
 
 
+def bot_board_filling(cur_board):
+    tec_number = 0
+    for new_ship_deck_number in range(1, 5):
+        for new_ship_deck_kol in range(5 - new_ship_deck_number):
+            # new ship info
+            new_head = (randrange(0, 10), randrange(0, 10))
+            horiz = bool(randrange(0, 2))
+            # ship adding
+            bot_board.add_ship(Ship(new_ship_deck_number,
+                                    new_head, horiz, tec_number))
+            while not cur_board.ships[-1].place_is_ok(cur_board):
+                # new ship info
+                new_head = (randrange(0, 10), randrange(0, 10))
+                horiz = bool(randrange(0, 2))
+                cur_board.ships[-1].set_head_pos(new_head)
+                if cur_board.ships[-1].is_horizontal() != horiz:
+                    cur_board.ships[-1].change_horizontal(cur_board)
+
+            cur_board.ships[-1].ship_render(cur_board.board)
+
+            tec_number += 1
+
+
 if __name__ == "__main__":
     pygame.init()
     pygame.display.set_caption('Battleship')
@@ -469,6 +501,7 @@ if __name__ == "__main__":
     fps = 60
     clock = pygame.time.Clock()
 
+    # the placing stage will be here
     # placing ships stage
     while ship_placement_stage:
         # checking events
@@ -530,12 +563,16 @@ if __name__ == "__main__":
         clock.tick(fps)
 
     # preparing for game
+    # player board
     size = width, height = 1000, 700
     screen = pygame.display.set_mode(size)
     player_board.set_view(40, 150, 40)
-
+    # bot board
     bot_board = Board(player_board.width, player_board.height)
     bot_board.set_view(500, 150, 40)
+    bot_board_filling(bot_board)
+    # order
+    player_order = True
 
     # game loop
     while not game_over:
@@ -543,11 +580,19 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 game_over = True
 
+            if event.type == pygame.MOUSEMOTION:
+                # board cells highlighting
+                player_board.cell_highlighting(event.pos)
+                bot_board.cell_highlighting(event.pos)
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                pass
+
         # screen updating
         screen.fill(BACKGROUND_COLOR)
         # boards ands btns
         player_board.render()
-
+        bot_board.render()
         # screen flip
         pygame.display.flip()
 
