@@ -12,6 +12,7 @@ TEXT_COLOR = (255, 100, 0)
 BUTTON_COLOR = (160, 214, 180)
 FOCUSED_BUTTON_COLOR = (113, 188, 120)
 PUSHED_BUTTON_COLOR = (181, 101, 167)
+SHOOTED_CELL_COLOR = BUTTON_COLOR
 
 
 class BoardCell:
@@ -30,6 +31,12 @@ class BoardCell:
 
     def set_cell_ship_number(self, cell_ship_number):
         self.cell_ship_number = cell_ship_number
+
+    def is_shooted(self):
+        return self.color == SHOOTED_CELL_COLOR
+
+    def set_shooted(self):
+        self.color = SHOOTED_CELL_COLOR
 
 
 class Deck:
@@ -50,7 +57,7 @@ class Deck:
     def is_injured(self):
         return self.injured
 
-    def set_injured(self, injured):
+    def set_injured(self, injured=True):
         self.injured = injured
 
     def set_cords(self, *cords):
@@ -61,6 +68,8 @@ class Ship:
     def __init__(self, decks_number=1, head_pos=(0, 0), horizontal=True, ship_number=0):
         # число палуб
         self.decks_number = decks_number
+        # is bot board
+        self.is_bot = False
         # горизонтальный / вертикальный
         # maybe head
         self.head_pos = head_pos
@@ -187,14 +196,86 @@ class Ship:
         self.placed = True
         return True
 
+    def is_deck_injured(self, cur_cell):
+        if self.horizontal:
+            deck_numb = cur_cell[1] - self.head_pos[1]
+        else:
+            deck_numb = cur_cell[0] - self.head_pos[0]
+
+        return self.decks[deck_numb].is_injured()
+
+    def set_deck_injured(self, cur_cell):
+        if self.horizontal:
+            deck_numb = cur_cell[1] - self.head_pos[1]
+        else:
+            deck_numb = cur_cell[0] - self.head_pos[0]
+
+        self.decks[deck_numb].set_injured()
+
+        self.alive = False
+        for deck in self.decks:
+            if not deck.is_injured():
+                self.alive = True
+
+    def set_bot_status(self, is_bot=True):
+        self.is_bot = is_bot
+
     def ship_render(self, board_list):
         for deck in self.decks:
             if not deck.is_injured():
                 board_list[deck.get_i()][deck.get_j()].set_cell_color(SHIP_COLOR)
+                if self.is_bot:
+                    board_list[deck.get_i()][deck.get_j()].set_cell_color(EMPTY_CELL_COLOR)
             else:
-                board_list[deck.get_j()][deck.get_j()].set_cell_color(INJURED_COLOR)
+                board_list[deck.get_i()][deck.get_j()].set_cell_color(INJURED_COLOR)
             if self.placed:
                 board_list[deck.get_i()][deck.get_j()].set_cell_ship_number(self.ship_number)
+
+        if not self.alive:
+            cur_i, cur_j = self.head_pos
+            cur_height, cur_width = (10, 10)
+            for x in range(self.decks_number):
+                # corners
+                if cur_i != 0 and cur_j != 0:
+                    board_list[cur_i - 1][cur_j - 1].set_shooted()
+                if cur_i != 0 and cur_j != cur_width - 1:
+                    board_list[cur_i - 1][cur_j + 1].set_shooted()
+
+                if cur_i != cur_height - 1 and cur_j != 0:
+                    board_list[cur_i + 1][cur_j - 1].set_shooted()
+                if cur_i != cur_height - 1 and cur_j != cur_width - 1:
+                    board_list[cur_i + 1][cur_j + 1].set_shooted()
+                # other cells
+                if self.horizontal:
+                    # tail or nose
+                    if x == 0:
+                        if cur_j != 0:
+                            board_list[cur_i][cur_j - 1].set_shooted()
+                    if x == self.decks_number - 1:
+                        if cur_j != cur_width - 1:
+                            board_list[cur_i][cur_j + 1].set_shooted()
+                    # all decks
+                    if cur_i < cur_height - 1:
+                        board_list[cur_i + 1][cur_j].set_shooted()
+                    if cur_i > 0:
+                        board_list[cur_i - 1][cur_j].set_shooted()
+                    # index growing
+                    cur_j += 1
+                else:
+                    # tail or nose
+                    if x == 0:
+                        if cur_i != 0:
+                            board_list[cur_i - 1][cur_j].set_shooted()
+                    if x == self.decks_number - 1:
+                        if cur_i != cur_height - 1:
+                            board_list[cur_i + 1][cur_j].set_shooted()
+                    # all decks
+                    if cur_j < cur_width - 1:
+                        board_list[cur_i][cur_j + 1].set_shooted()
+                    if cur_j > 0:
+                        board_list[cur_i][cur_j - 1].set_shooted()
+                    # index growing
+                    cur_i += 1
 
 
 class ChooseShipButton:
@@ -268,7 +349,8 @@ class Board:
         self.board = list()
         # board filling
         self.board_filling()
-
+        # shooted cells
+        self.shooted = list()
         # значения по умолчанию
         self.left = 10
         self.top = 10
@@ -376,7 +458,7 @@ class Board:
                                  (cur_cell_x, cur_cell_y,
                                   self.cell_size, self.cell_size), 3,
                                  border_radius=8)
-
+                # cur color
                 cur_color = self.board[i][j].get_cell_color()
                 pygame.draw.rect(screen, pygame.Color(cur_color),
                                  (cur_cell_x + 3, cur_cell_y + 3,
@@ -404,21 +486,34 @@ class Board:
         self.on_click(cell)
 
     def cell_highlighting(self, mouse_pos):
+        global player_fired
         cell = self.get_cell(mouse_pos)
-        # last cell reset
-        reset_i, reset_j = self.last_highlighted_cell_cords
-        if reset_i != -1:
-            old_color = tuple(self.last_highlighted_cell_color)
-            self.board[reset_i][reset_j].set_cell_color(old_color)
-        if cell and cell != self.last_highlighted_cell_cords:
-            cur_color = pygame.Color(self.board[cell[0]][cell[1]].get_cell_color())
-            # last cell info update
-            self.last_highlighted_cell_cords = cell
-            self.last_highlighted_cell_color = tuple(cur_color)
-            hsv = cur_color.hsva
-            # увеличиваем параметр Value, который влияет на яркость
-            cur_color.hsva = (hsv[0], hsv[1], min(100.0, hsv[2] + 10), hsv[3])
-            self.board[cell[0]][cell[1]].set_cell_color(cur_color)
+        if cell is not None:
+            # last cell reset
+            reset_i, reset_j = self.last_highlighted_cell_cords
+            if (reset_i, reset_j) not in self.shooted:
+                self.shooted.append((reset_i, reset_j))
+                if reset_i != -1:
+                    old_color = self.last_highlighted_cell_color
+                    if type(self.last_highlighted_cell_color) != str:
+                        old_color = tuple(self.last_highlighted_cell_color)
+                    self.board[reset_i][reset_j].set_cell_color(old_color)
+                if cell and cell != self.last_highlighted_cell_cords:
+                    cur_color = pygame.Color(self.board[cell[0]][cell[1]].get_cell_color())
+                    # last cell info update
+                    self.last_highlighted_cell_cords = cell
+                    self.last_highlighted_cell_color = cur_color
+                    if type(cur_color) != str:
+                        self.last_highlighted_cell_color = tuple(cur_color)
+                    hsv = cur_color.hsva
+                    # увеличиваем параметр Value, который влияет на яркость
+                    cur_color.hsva = (hsv[0], hsv[1], min(100.0, hsv[2] + 10), hsv[3])
+                    self.board[cell[0]][cell[1]].set_cell_color(cur_color)
+
+            else:
+                # last cell info update
+                self.last_highlighted_cell_cords = cell
+                self.last_highlighted_cell_color = EMPTY_CELL_COLOR
 
     def get_move(self, cur_pos):
         if self.placing_ship:
@@ -431,6 +526,55 @@ class Board:
                 # set new head position
                 self.ships[-1].set_head_pos((new_head_i, new_head_j))
 
+    def get_attack(self, curs_pos, cell_attacked=None):
+        cell = cell_attacked
+        if not cell_attacked:
+            cell = self.get_cell(curs_pos)
+        global player_fired, player_order
+        if cell:
+            damaged_ship_number = self.board[cell[0]][cell[1]].get_cell_ship_number()
+            if damaged_ship_number is not None:
+                # shoot to injured cell
+                if self.ships[damaged_ship_number].is_deck_injured(cell):
+                    pass
+                else:
+                    self.ships[damaged_ship_number].set_deck_injured(cell)
+                    player_fired = True
+            # shoot to empty cell
+            else:
+                self.board[cell[0]][cell[1]].set_shooted()
+                self.shooted.append(cell)
+                player_order = not player_order
+                player_fired = True
+
+    def is_attacked(self, cell):
+        damaged_ship_number = self.board[cell[0]][cell[1]].get_cell_ship_number()
+        if damaged_ship_number is not None:
+            # shoot to injured cell
+            if self.ships[damaged_ship_number].is_deck_injured(cell):
+                return True
+        return False
+
+
+class Bot:
+    def __init__(self):
+        self.already_shoot = list()
+
+    def get_already_shoot(self):
+        return self.already_shoot
+
+    def bot_attack(self, cur_board):
+        attacked = (randrange(0, 10), randrange(0, 10))
+        while attacked in self.already_shoot:
+            attacked = (randrange(0, 10), randrange(0, 10))
+        cur_board.get_attack(None, cell_attacked=attacked)
+        self.already_shoot.append(attacked)
+        if not cur_board.is_attacked(attacked):
+            global player_order
+            player_order = True
+
+        pygame.time.wait(1500)
+
 
 def battle_begins_table_render():
     # render table
@@ -438,7 +582,7 @@ def battle_begins_table_render():
     font = pygame.font.Font(None, 50)
     text = font.render(table_text, True, (100, 255, 100))
     text_x = player_board.left + 115
-    text_y = player_board.top + player_board.cell_size * player_board.height + 15
+    text_y = player_board.top + player_board.cell_size * player_board.height + 20
     text_w = text.get_width()
     text_h = text.get_height()
     screen.blit(text, (text_x, text_y))
@@ -454,7 +598,7 @@ def bot_board_filling(cur_board):
             new_head = (randrange(0, 10), randrange(0, 10))
             horiz = bool(randrange(0, 2))
             # ship adding
-            bot_board.add_ship(Ship(new_ship_deck_number,
+            cur_board.add_ship(Ship(new_ship_deck_number,
                                     new_head, horiz, tec_number))
             while not cur_board.ships[-1].place_is_ok(cur_board):
                 # new ship info
@@ -465,8 +609,45 @@ def bot_board_filling(cur_board):
                     cur_board.ships[-1].change_horizontal(cur_board)
 
             cur_board.ships[-1].ship_render(cur_board.board)
-
+            cur_board.ships[-1].set_bot_status()
             tec_number += 1
+
+
+def order_table_render(is_player_order):
+    # render table
+    table_text = 'Bot order'
+    if is_player_order:
+        table_text = 'Your order'
+    font = pygame.font.Font(None, 50)
+    text = font.render(table_text, True, (100, 255, 100))
+    text_x = screen.get_size()[1] // 2 + 30
+    text_y = player_board.top + player_board.cell_size * player_board.height + 20
+    text_w = text.get_width()
+    text_h = text.get_height()
+    screen.blit(text, (text_x, text_y))
+    pygame.draw.rect(screen, PUSHED_BUTTON_COLOR, (text_x - 10, text_y - 10,
+                                                   text_w + 20, text_h + 20), 1)
+
+
+def game_over_table_render(pl_lose, bt_lose):
+    table_text = ''
+    if pl_lose:
+        table_text = 'You lose!'
+    if bt_lose:
+        table_text = 'You win!'
+    font = pygame.font.Font(None, 50)
+    text = font.render(table_text, True, (100, 255, 100))
+    text_x = screen.get_size()[1] // 2 + 30
+    text_y = player_board.top + player_board.cell_size * player_board.height + 20
+    text_w = text.get_width()
+    text_h = text.get_height()
+    screen.blit(text, (text_x, text_y))
+    pygame.draw.rect(screen, PUSHED_BUTTON_COLOR, (text_x - 10, text_y - 10,
+                                                   text_w + 20, text_h + 20), 1)
+    # screen flip
+    pygame.display.flip()
+    # wait
+    pygame.time.wait(2000)
 
 
 if __name__ == "__main__":
@@ -501,7 +682,6 @@ if __name__ == "__main__":
     fps = 60
     clock = pygame.time.Clock()
 
-    # the placing stage will be here
     # placing ships stage
     while ship_placement_stage:
         # checking events
@@ -563,6 +743,9 @@ if __name__ == "__main__":
         clock.tick(fps)
 
     # preparing for game
+    bot = Bot()
+    player_lose = False
+    bot_lose = False
     # player board
     size = width, height = 1000, 700
     screen = pygame.display.set_mode(size)
@@ -573,6 +756,7 @@ if __name__ == "__main__":
     bot_board_filling(bot_board)
     # order
     player_order = True
+    player_fired = False
 
     # game loop
     while not game_over:
@@ -582,22 +766,56 @@ if __name__ == "__main__":
 
             if event.type == pygame.MOUSEMOTION:
                 # board cells highlighting
-                player_board.cell_highlighting(event.pos)
-                bot_board.cell_highlighting(event.pos)
+                # player_board.cell_highlighting(event.pos)
+                # bot_board.cell_highlighting(event.pos)
+                pass
 
             if event.type == pygame.MOUSEBUTTONDOWN:
-                pass
+                if player_order:
+                    player_fired = False
+                    bot_board.get_attack(event.pos)
+
+        # bot order
+        if not player_order and not player_fired:
+            # bot attack
+            player_fired = True
+            bot.bot_attack(player_board)
 
         # screen updating
         screen.fill(BACKGROUND_COLOR)
-        # boards ands btns
+        # boards
         player_board.render()
         bot_board.render()
+        # player fired
+        player_fired = False
+
+        # game over finding
+        player_lose = True
+        bot_lose = True
+        for ship in player_board.ships:
+            if ship.alive:
+                player_lose = False
+        for ship in bot_board.ships:
+            if ship.alive:
+                bot_lose = False
+
+        if player_lose or bot_lose:
+            game_over = True
+
+        # render order table
+        order_table_render(player_order)
+
         # screen flip
         pygame.display.flip()
-
         # delay for constant fps
         clock.tick(fps)
+
+    # boards
+    # screen updating
+    screen.fill(BACKGROUND_COLOR)
+    player_board.render()
+    bot_board.render()
+    game_over_table_render(player_lose, bot_lose)
 
 # game ending
 pygame.quit()
