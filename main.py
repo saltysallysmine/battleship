@@ -378,7 +378,7 @@ class Board:
     def get_cell(self, mouse_pos):
         if 0 < mouse_pos[0] - self.left < self.cell_size * self.width and \
                 0 < mouse_pos[1] - self.top < self.cell_size * self.height:
-            clicked_cell_i = (mouse_pos[1] - self.left) // self.cell_size
+            clicked_cell_i = (mouse_pos[1] - self.top) // self.cell_size
             clicked_cell_j = (mouse_pos[0] - self.left) // self.cell_size
 
             return clicked_cell_i, clicked_cell_j
@@ -447,6 +447,8 @@ if __name__ == "__main__":
 
     # ship placement stage
     ship_placement_stage = True
+    # game over
+    game_over = False
     # start game flag
     battle_begins_table_need = False
 
@@ -467,12 +469,13 @@ if __name__ == "__main__":
     fps = 60
     clock = pygame.time.Clock()
 
-    running = True
-    while running:
+    # placing ships stage
+    while ship_placement_stage:
         # checking events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                ship_placement_stage = False
+                game_over = True
 
             if event.type == pygame.MOUSEMOTION:
                 # choose btns
@@ -514,8 +517,10 @@ if __name__ == "__main__":
         # battle begins table
         if battle_begins_table_need:
             battle_begins_table_render()
+
         # screen flip
         pygame.display.flip()
+
         # battle begins table delete
         if battle_begins_table_need:
             battle_begins_table_need = False
@@ -524,5 +529,30 @@ if __name__ == "__main__":
         # delay for constant fps
         clock.tick(fps)
 
-    # game ending
-    pygame.quit()
+    # preparing for game
+    size = width, height = 1000, 700
+    screen = pygame.display.set_mode(size)
+    player_board.set_view(40, 150, 40)
+
+    bot_board = Board(player_board.width, player_board.height)
+    bot_board.set_view(500, 150, 40)
+
+    # game loop
+    while not game_over:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                game_over = True
+
+        # screen updating
+        screen.fill(BACKGROUND_COLOR)
+        # boards ands btns
+        player_board.render()
+
+        # screen flip
+        pygame.display.flip()
+
+        # delay for constant fps
+        clock.tick(fps)
+
+# game ending
+pygame.quit()
