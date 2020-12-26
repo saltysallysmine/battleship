@@ -1,3 +1,4 @@
+import sys
 import pygame
 from random import randint, randrange
 from pprint import pprint as write
@@ -666,6 +667,11 @@ def game_over_table_render(pl_lose, bt_lose):
     pygame.time.wait(2000)
 
 
+def terminate():
+    pygame.quit()
+    sys.exit()
+
+
 if __name__ == "__main__":
     pygame.init()
     pygame.display.set_caption('Battleship')
@@ -705,6 +711,7 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 ship_placement_stage = False
                 game_over = True
+                terminate()
 
             if event.type == pygame.MOUSEMOTION:
                 # choose btns
@@ -779,6 +786,7 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 game_over = True
+                terminate()
 
             if event.type == pygame.MOUSEMOTION:
                 # board cells highlighting
