@@ -33,13 +33,22 @@ class BoardCell:
         return self.color
 
     def set_cell_color(self, color):
-        self.color = color
         self.unfocused_color = color
 
-        hsv = pygame.Color(self.color).hsva
-        cur_color = pygame.Color(self.color)
-        cur_color.hsva = (hsv[0], hsv[1], min(100.0, hsv[2] + 10), hsv[3])
+        hsv = pygame.Color(self.unfocused_color).hsva
+        cur_color = pygame.Color(self.unfocused_color)
+        if hsv[2] + 10 < 100:
+            cur_color.hsva = (hsv[0], hsv[1], hsv[2] + 10, hsv[3])
+        else:
+            cur_color.hsva = ((hsv[0] + 10) % 360, hsv[1], hsv[2], hsv[3])
         self.focused_color = tuple(cur_color)
+
+        self.color = color
+
+        if self.focused:
+            self.color = self.focused_color
+        else:
+            self.color = self.unfocused_color
 
     def set_focused_status(self, status):
         self.focused = status
@@ -59,7 +68,7 @@ class BoardCell:
         return self.color == SHOOTED_CELL_COLOR
 
     def set_shooted(self):
-        self.color = SHOOTED_CELL_COLOR
+        self.set_cell_color(SHOOTED_CELL_COLOR)
 
 
 class Deck:
@@ -533,12 +542,20 @@ class Board:
                 # set new head position
                 self.ships[-1].set_head_pos((new_head_i, new_head_j))
 
+    def is_attacked(self, cell):
+        damaged_ship_number = self.board[cell[0]][cell[1]].get_cell_ship_number()
+        if damaged_ship_number is not None:
+            # shoot to injured cell
+            if self.ships[damaged_ship_number].is_deck_injured(cell):
+                return True
+        return False
+
     def get_attack(self, curs_pos, cell_attacked=None):
         cell = cell_attacked
         if not cell_attacked:
             cell = self.get_cell(curs_pos)
         global player_fired, player_order
-        if cell:
+        if cell and not self.is_attacked(cell):
             damaged_ship_number = self.board[cell[0]][cell[1]].get_cell_ship_number()
             if damaged_ship_number is not None:
                 # shoot to injured cell
@@ -553,14 +570,6 @@ class Board:
                 self.shooted.append(cell)
                 player_order = not player_order
                 player_fired = True
-
-    def is_attacked(self, cell):
-        damaged_ship_number = self.board[cell[0]][cell[1]].get_cell_ship_number()
-        if damaged_ship_number is not None:
-            # shoot to injured cell
-            if self.ships[damaged_ship_number].is_deck_injured(cell):
-                return True
-        return False
 
 
 class Bot:
