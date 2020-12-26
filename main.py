@@ -17,7 +17,16 @@ SHOOTED_CELL_COLOR = BUTTON_COLOR
 
 class BoardCell:
     def __init__(self, color):
+        # the current color of the cell
         self.color = color
+        # two cell color options
+        self.unfocused_color = color
+        self.focused_color = color
+        # determines the current color option
+        self.focused = False
+        # update color options
+        self.set_cell_color(color)
+        # the ship that occupies the cell
         self.cell_ship_number = None
 
     def get_cell_color(self):
@@ -25,6 +34,20 @@ class BoardCell:
 
     def set_cell_color(self, color):
         self.color = color
+        self.unfocused_color = color
+
+        hsv = pygame.Color(self.color).hsva
+        cur_color = pygame.Color(self.color)
+        cur_color.hsva = (hsv[0], hsv[1], min(100.0, hsv[2] + 10), hsv[3])
+        self.focused_color = tuple(cur_color)
+
+    def set_focused_status(self, status):
+        self.focused = status
+
+        if self.focused:
+            self.color = self.focused_color
+        else:
+            self.color = self.unfocused_color
 
     def get_cell_ship_number(self):
         return self.cell_ship_number
@@ -368,8 +391,7 @@ class Board:
         self.ships = list()
 
         # the last highlighted cell info
-        self.last_highlighted_cell_color = EMPTY_CELL_COLOR
-        self.last_highlighted_cell_cords = (-1, -1)
+        self.last_highlighted_cell_cords = None
 
         # new ship placing flag
         self.placing_ship = False
@@ -486,34 +508,19 @@ class Board:
         self.on_click(cell)
 
     def cell_highlighting(self, mouse_pos):
+        # необходимость player_fired ????????
         global player_fired
         cell = self.get_cell(mouse_pos)
-        if cell is not None:
-            # last cell reset
-            reset_i, reset_j = self.last_highlighted_cell_cords
-            if (reset_i, reset_j) not in self.shooted:
-                self.shooted.append((reset_i, reset_j))
-                if reset_i != -1:
-                    old_color = self.last_highlighted_cell_color
-                    if type(self.last_highlighted_cell_color) != str:
-                        old_color = tuple(self.last_highlighted_cell_color)
-                    self.board[reset_i][reset_j].set_cell_color(old_color)
-                if cell and cell != self.last_highlighted_cell_cords:
-                    cur_color = pygame.Color(self.board[cell[0]][cell[1]].get_cell_color())
-                    # last cell info update
-                    self.last_highlighted_cell_cords = cell
-                    self.last_highlighted_cell_color = cur_color
-                    if type(cur_color) != str:
-                        self.last_highlighted_cell_color = tuple(cur_color)
-                    hsv = cur_color.hsva
-                    # увеличиваем параметр Value, который влияет на яркость
-                    cur_color.hsva = (hsv[0], hsv[1], min(100.0, hsv[2] + 10), hsv[3])
-                    self.board[cell[0]][cell[1]].set_cell_color(cur_color)
 
-            else:
-                # last cell info update
-                self.last_highlighted_cell_cords = cell
-                self.last_highlighted_cell_color = EMPTY_CELL_COLOR
+        # the last focused cell update
+        if self.last_highlighted_cell_cords:
+            reset_i, reset_j = self.last_highlighted_cell_cords
+            self.board[reset_i][reset_j].set_focused_status(False)
+        self.last_highlighted_cell_cords = cell
+
+        # the currently focused cell update
+        if cell is not None:
+            self.board[cell[0]][cell[1]].set_focused_status(True)
 
     def get_move(self, cur_pos):
         if self.placing_ship:
@@ -766,9 +773,8 @@ if __name__ == "__main__":
 
             if event.type == pygame.MOUSEMOTION:
                 # board cells highlighting
-                # player_board.cell_highlighting(event.pos)
-                # bot_board.cell_highlighting(event.pos)
-                pass
+                player_board.cell_highlighting(event.pos)
+                bot_board.cell_highlighting(event.pos)
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if player_order:
