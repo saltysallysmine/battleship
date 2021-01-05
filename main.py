@@ -840,5 +840,5 @@ if __name__ == "__main__":
     bot_board.render()
     game_over_table_render(player_lose, bot_lose)
 
-# game ending
-pygame.quit()
+    # game ending
+    pygame.quit()
