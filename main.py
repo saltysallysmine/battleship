@@ -351,6 +351,7 @@ class Button:
 
     def set_active(self, active):
         self.is_active = active
+        self.btn_color = INACTIVE_CELL_COLOR
 
     def is_focused(self, cur_pos):
         return 0 < cur_pos[0] - self.head_x < self.width \
@@ -391,8 +392,24 @@ class ChooseShipButton(Button):
                 # allowed ship number updating
                 self.allowed_ship_number = max(0, self.allowed_ship_number - 1)
                 if not self.allowed_ship_number:
-                    self.btn_color = INACTIVE_CELL_COLOR
                     self.set_active(False)
+
+
+class RandomlyFillButton(Button):
+    def __init__(self, head, btn_size, text, parent_board):
+        super().__init__(head, btn_size, text)
+        self.parent_board = parent_board
+
+    def button_pushed(self, cur_pos):
+        if self.is_focused(cur_pos) and self.is_active:
+            self.set_pushed_color()
+            self.parent_board.randomly_fill()
+            # game status
+            global ship_placement_stage, battle_begins_table_need
+            ship_placement_stage = False
+            battle_begins_table_need = True
+            global choose_ship_btns
+            choose_ship_btns.clear()
 
 
 class Board:
@@ -431,6 +448,8 @@ class Board:
 
         # required number of ships
         self.need_to_place_ships = 10
+
+        self.board_of_bot = False
 
     # add ship function
     def add_ship(self, new_ship):
@@ -590,6 +609,9 @@ class Board:
                 player_order = not player_order
                 player_fired = True
 
+    def set_board_of_bot_status(self, status):
+        self.board_of_bot = status
+
     def randomly_fill(self):
         tec_number = 0
         for new_ship_deck_number in range(1, 5):
@@ -609,7 +631,8 @@ class Board:
                         self.ships[-1].change_horizontal(self)
 
                 self.ships[-1].ship_render(self.board)
-                self.ships[-1].set_bot_status()
+                if self.board_of_bot:
+                    self.ships[-1].set_bot_status()
                 tec_number += 1
 
 
@@ -713,13 +736,14 @@ if __name__ == "__main__":
                               player_board.cell_size * 10 + 15),
                              (125, 80), f'x{i}'))
     # randomly fill button creating
-    randomly_fill_btn = Button((100, 100), (100, 50), 'fill it randomly')
+    randomly_fill_btn = RandomlyFillButton((300, 30), (100, 50),
+                                           'fill it randomly', player_board)
 
     # fps
     fps = 60
     clock = pygame.time.Clock()
 
-    # placing ships stage
+    # placing ships stage loop
     while ship_placement_stage:
         # checking events
         for event in pygame.event.get():
@@ -730,10 +754,11 @@ if __name__ == "__main__":
 
             if event.type == pygame.MOUSEMOTION:
                 # choose btns
-                if ship_placement_stage:
-                    for btns in choose_ship_btns:
-                        btns.get_motion(event.pos)
-                    player_board.get_move(event.pos)
+                for btns in choose_ship_btns:
+                    btns.get_motion(event.pos)
+                player_board.get_move(event.pos)
+                # randomly fill btn
+                randomly_fill_btn.get_motion(event.pos)
                 # board cells highlighting
                 player_board.cell_highlighting(event.pos)
 
@@ -742,6 +767,8 @@ if __name__ == "__main__":
                 if ship_placement_stage:
                     for el in choose_ship_btns:
                         el.button_pushed(event.pos, player_board)
+                # randomly fill btn
+                randomly_fill_btn.button_pushed(event.pos)
                 # player_board.get_click(event.pos)
 
             if event.type == pygame.MOUSEBUTTONUP:
@@ -749,6 +776,8 @@ if __name__ == "__main__":
                 if ship_placement_stage:
                     for el in choose_ship_btns:
                         el.button_unpushed(event.pos)
+                # randomly fill btn
+                randomly_fill_btn.button_unpushed(event.pos)
 
             if event.type == pygame.KEYDOWN:
                 if player_board.placing_ship:
@@ -760,6 +789,8 @@ if __name__ == "__main__":
                         if player_board.ships[-1].place_is_ok(player_board):
                             player_board.placing_ship = False
                             player_board.reduce_required_number_of_ships()
+                            # if at least one ship placed
+                            randomly_fill_btn.set_active(False)
 
         # screen updating
         screen.fill(BACKGROUND_COLOR)
@@ -784,16 +815,17 @@ if __name__ == "__main__":
         clock.tick(fps)
 
     # preparing for game
-    bot = Bot()
     player_lose = False
     bot_lose = False
     # player board
     size = width, height = 1000, 700
     screen = pygame.display.set_mode(size)
     player_board.set_view(40, 150, 40)
-    # bot board
+    # bot settings
+    bot = Bot()
     bot_board = Board(player_board.width, player_board.height)
     bot_board.set_view(500, 150, 40)
+    bot_board.set_board_of_bot_status(True)
     bot_board.randomly_fill()
     # order
     player_order = True
