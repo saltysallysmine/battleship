@@ -318,8 +318,8 @@ class Button:
         self.text = text
         self.btn_color = BUTTON_COLOR
         self.border_color = BORDERS_COLOR
-        # the state of the btn
         self.is_active = True
+        self.auto_size_change()
 
     def btn_render(self):
         # button
@@ -337,6 +337,17 @@ class Button:
         text_rect = text.get_rect(center=(self.head_x + self.width // 2,
                                           self.head_y + self.height // 2))
         screen.blit(text, text_rect)
+
+    def auto_size_change(self):
+        # text rectangle
+        font = pygame.font.Font(None, 50)
+        text = font.render(self.text, True, pygame.Color(TEXT_COLOR))
+        text_rect = text.get_rect(center=(self.head_x + self.width // 2,
+                                          self.head_y + self.height // 2))
+        # compare the values of size
+        self.width = max(self.width, text_rect.size[0] + 20)
+        self.height = max(self.height, text_rect.size[1] + 20)
+        self.size = (self.width, self.height)
 
     def set_active(self, active):
         self.is_active = active
@@ -467,13 +478,10 @@ class Board:
 
     # board render
     def render(self):
-        # rendering choose ship buttons
         if ship_placement_stage:
             if self.placing_ship:
                 self.board = list()
                 self.board_filling()
-            for btn in choose_ship_btns:
-                btn.btn_render()
 
         # rendering rows names
         cur_x = self.left
@@ -530,8 +538,6 @@ class Board:
         self.on_click(cell)
 
     def cell_highlighting(self, mouse_pos):
-        # необходимость player_fired ????????
-        global player_fired
         cell = self.get_cell(mouse_pos)
 
         # the last focused cell update
@@ -584,6 +590,28 @@ class Board:
                 player_order = not player_order
                 player_fired = True
 
+    def randomly_fill(self):
+        tec_number = 0
+        for new_ship_deck_number in range(1, 5):
+            for new_ship_deck_kol in range(5 - new_ship_deck_number):
+                # new ship info
+                new_head = (randrange(0, 10), randrange(0, 10))
+                horiz = bool(randrange(0, 2))
+                # ship adding
+                self.add_ship(Ship(new_ship_deck_number,
+                                   new_head, horiz, tec_number))
+                while not self.ships[-1].place_is_ok(self):
+                    # new ship info
+                    new_head = (randrange(0, 10), randrange(0, 10))
+                    horiz = bool(randrange(0, 2))
+                    self.ships[-1].set_head_pos(new_head)
+                    if self.ships[-1].is_horizontal() != horiz:
+                        self.ships[-1].change_horizontal(self)
+
+                self.ships[-1].ship_render(self.board)
+                self.ships[-1].set_bot_status()
+                tec_number += 1
+
 
 class Bot:
     def __init__(self):
@@ -617,29 +645,6 @@ def battle_begins_table_render():
     screen.blit(text, (text_x, text_y))
     pygame.draw.rect(screen, PUSHED_BUTTON_COLOR, (text_x - 10, text_y - 10,
                                                    text_w + 20, text_h + 20), 1)
-
-
-def bot_board_filling(cur_board):
-    tec_number = 0
-    for new_ship_deck_number in range(1, 5):
-        for new_ship_deck_kol in range(5 - new_ship_deck_number):
-            # new ship info
-            new_head = (randrange(0, 10), randrange(0, 10))
-            horiz = bool(randrange(0, 2))
-            # ship adding
-            cur_board.add_ship(Ship(new_ship_deck_number,
-                                    new_head, horiz, tec_number))
-            while not cur_board.ships[-1].place_is_ok(cur_board):
-                # new ship info
-                new_head = (randrange(0, 10), randrange(0, 10))
-                horiz = bool(randrange(0, 2))
-                cur_board.ships[-1].set_head_pos(new_head)
-                if cur_board.ships[-1].is_horizontal() != horiz:
-                    cur_board.ships[-1].change_horizontal(cur_board)
-
-            cur_board.ships[-1].ship_render(cur_board.board)
-            cur_board.ships[-1].set_bot_status()
-            tec_number += 1
 
 
 def order_table_render(is_player_order):
@@ -687,10 +692,10 @@ def terminate():
 if __name__ == "__main__":
     pygame.init()
     pygame.display.set_caption('Battleship')
-    size = width, height = 700, 700
+    size = width, height = 900, 750
     screen = pygame.display.set_mode(size)
     player_board = Board(10, 10)
-    player_board.set_view(80, 80, 50)
+    player_board.set_view(200, 150, 50)
 
     # ship placement stage
     ship_placement_stage = True
@@ -699,11 +704,7 @@ if __name__ == "__main__":
     # start game flag
     battle_begins_table_need = False
 
-    # test items
-    # test ship
-    # player_board.add_ship(Ship(decks_number=3))
-
-    # choose ship buttons rendering
+    # choose ship buttons creating
     choose_ship_btns = list()
     for i in range(1, 5):
         choose_ship_btns.append(
@@ -711,6 +712,8 @@ if __name__ == "__main__":
                               player_board.top +
                               player_board.cell_size * 10 + 15),
                              (125, 80), f'x{i}'))
+    # randomly fill button creating
+    randomly_fill_btn = Button((100, 100), (100, 50), 'fill it randomly')
 
     # fps
     fps = 60
@@ -761,6 +764,9 @@ if __name__ == "__main__":
         # screen updating
         screen.fill(BACKGROUND_COLOR)
         # boards ands btns
+        for btn in choose_ship_btns:
+            btn.btn_render()
+        randomly_fill_btn.btn_render()
         player_board.render()
         # battle begins table
         if battle_begins_table_need:
@@ -788,7 +794,7 @@ if __name__ == "__main__":
     # bot board
     bot_board = Board(player_board.width, player_board.height)
     bot_board.set_view(500, 150, 40)
-    bot_board_filling(bot_board)
+    bot_board.randomly_fill()
     # order
     player_order = True
     player_fired = False
