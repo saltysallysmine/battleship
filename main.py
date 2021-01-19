@@ -1,6 +1,6 @@
 import sys
 import pygame
-from random import randint, randrange
+from random import randint, randrange, random
 from pprint import pprint as write
 
 BACKGROUND_COLOR = (28, 28, 28)
@@ -367,6 +367,9 @@ class Button:
     def set_pushed_color(self):
         self.btn_color = PUSHED_BUTTON_COLOR
 
+    def is_button_pushed(self, cur_pos):
+        return self.is_focused(cur_pos)
+
     def button_unpushed(self, cur_pos):
         if self.is_focused(cur_pos) and self.is_active:
             self.btn_color = FOCUSED_BUTTON_COLOR
@@ -660,7 +663,7 @@ def battle_begins_table_render():
     # render table
     table_text = 'The battle begins'
     font = pygame.font.Font(None, 50)
-    text = font.render(table_text, True, (100, 255, 100))
+    text = font.render(table_text, True, pygame.Color(SHIP_COLOR))
     text_x = player_board.left + 115
     text_y = player_board.top + player_board.cell_size * player_board.height + 20
     text_w = text.get_width()
@@ -676,7 +679,7 @@ def order_table_render(is_player_order):
     if is_player_order:
         table_text = 'Your order'
     font = pygame.font.Font(None, 50)
-    text = font.render(table_text, True, (100, 255, 100))
+    text = font.render(table_text, True, pygame.Color(SHIP_COLOR))
     text_x = screen.get_size()[1] // 2 + 30
     text_y = player_board.top + player_board.cell_size * player_board.height + 20
     text_w = text.get_width()
@@ -693,7 +696,7 @@ def game_over_table_render(pl_lose, bt_lose):
     if bt_lose:
         table_text = 'You win!'
     font = pygame.font.Font(None, 50)
-    text = font.render(table_text, True, (100, 255, 100))
+    text = font.render(table_text, True, pygame.Color(SHIP_COLOR))
     text_x = screen.get_size()[1] // 2 + 30
     text_y = player_board.top + player_board.cell_size * player_board.height + 20
     text_w = text.get_width()
@@ -719,11 +722,60 @@ if __name__ == "__main__":
     screen = pygame.display.set_mode(size)
     player_board = Board(10, 10)
     player_board.set_view(200, 150, 50)
+    # fps
+    fps = 60
+    clock = pygame.time.Clock()
 
-    # ship placement stage
-    ship_placement_stage = True
-    # game over
-    game_over = False
+    running = True
+    menu = True
+    ship_placement_stage = False
+    game = False
+
+    # MENU STAGE
+
+    # btns
+    center_w, center_h = width // 2, height // 2
+    play_btn = Button((center_w - 100, center_h + 50), (200, 10), "Play")
+    exit_btn = Button((center_w - 100, center_h + 150), (200, 10), "Exit")
+    menu_btns = [play_btn, exit_btn]
+    # title
+    font = pygame.font.Font(None, 120)
+    title_text = font.render('Battleship', True, pygame.Color(SHIP_COLOR))
+    title_text_rect = title_text.get_rect(center=(center_w, center_h - 150))
+
+    while menu:
+        # checking events
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+
+            if event.type == pygame.MOUSEMOTION:
+                for btn in menu_btns:
+                    btn.get_motion(event.pos)
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if play_btn.is_button_pushed(event.pos):
+                    menu = False
+                    ship_placement_stage = True
+                if exit_btn.is_button_pushed(event.pos):
+                    terminate()
+
+            if event.type == pygame.MOUSEBUTTONUP:
+                for btn in menu_btns:
+                    btn.button_unpushed(event.pos)
+
+        # screen updating
+        screen.fill(BACKGROUND_COLOR)
+        # title
+        screen.blit(title_text, title_text_rect)
+        # btn
+        for btn in menu_btns:
+            btn.btn_render()
+        # screen flip
+        pygame.display.flip()
+
+    # SHIP PLACEMENT STAGE
+
     # start game flag
     battle_begins_table_need = False
 
@@ -736,12 +788,8 @@ if __name__ == "__main__":
                               player_board.cell_size * 10 + 15),
                              (125, 80), f'x{i}'))
     # randomly fill button creating
-    randomly_fill_btn = RandomlyFillButton((300, 30), (100, 50),
+    randomly_fill_btn = RandomlyFillButton((center_w - 127, 30), (100, 50),
                                            'fill it randomly', player_board)
-
-    # fps
-    fps = 60
-    clock = pygame.time.Clock()
 
     # placing ships stage loop
     while ship_placement_stage:
@@ -749,13 +797,13 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 ship_placement_stage = False
-                game_over = True
+                game = False
                 terminate()
 
             if event.type == pygame.MOUSEMOTION:
                 # choose btns
-                for btns in choose_ship_btns:
-                    btns.get_motion(event.pos)
+                for btn in choose_ship_btns:
+                    btn.get_motion(event.pos)
                 player_board.get_move(event.pos)
                 # randomly fill btn
                 randomly_fill_btn.get_motion(event.pos)
@@ -814,7 +862,9 @@ if __name__ == "__main__":
         # delay for constant fps
         clock.tick(fps)
 
-    # preparing for game
+    # GAME STAGE
+
+    game = True
     player_lose = False
     bot_lose = False
     # player board
@@ -832,10 +882,10 @@ if __name__ == "__main__":
     player_fired = False
 
     # game loop
-    while not game_over:
+    while game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                game_over = True
+                game = False
                 terminate()
 
             if event.type == pygame.MOUSEMOTION:
@@ -873,7 +923,7 @@ if __name__ == "__main__":
                 bot_lose = False
 
         if player_lose or bot_lose:
-            game_over = True
+            game = False
 
         # render order table
         order_table_render(player_order)
