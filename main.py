@@ -881,7 +881,7 @@ if __name__ == "__main__":
             # player board
             player_lose = False
             bot_lose = False
-            size = width, height = 1000, 700
+            size = width, height = 920, 700
             screen = pygame.display.set_mode(size)
             player_board.set_view(40, 150, 40)
             # bot settings
