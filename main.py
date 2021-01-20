@@ -958,6 +958,7 @@ if __name__ == "__main__":
             player_board.render()
             bot_board.render()
             game_over_table_render(player_lose, bot_lose)
+            running = False
 
     # game ending
     pygame.quit()
