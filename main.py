@@ -349,6 +349,15 @@ class Button:
         self.height = max(self.height, text_rect.size[1] + 20)
         self.size = (self.width, self.height)
 
+    def head_is_center(self, hd_is_cen=True):
+        if hd_is_cen:
+            self.head_x -= self.width // 2
+            self.head_y -= self.height // 2
+        else:
+            self.head_x += self.width // 2
+            self.head_y += self.height // 2
+        self.head = self.head_x, self.head_y
+
     def set_active(self, active):
         self.is_active = active
         self.btn_color = INACTIVE_CELL_COLOR
@@ -478,13 +487,19 @@ class Board:
             choose_ship_btns.clear()
 
     # настройка внешнего вида
-    def set_view(self, left, top, cell_size):
+    def set_view(self, left, top, cell_size, central=False):
+        self.cell_size = cell_size
         self.left = left
         self.top = top
-        self.cell_size = cell_size
+        if central:
+            self.left -= self.width * self.cell_size // 2
+            self.top -= self.height * self.cell_size // 2
 
     def get_size(self):
         return self.height, self.width
+
+    def get_cell_size(self):
+        return self.cell_size
 
     def rendering_symbol(self, symbol_number, symbol_x, symbol_y, rows=True):
         if rows:
@@ -718,11 +733,11 @@ def terminate():
 if __name__ == "__main__":
     pygame.init()
     pygame.display.set_caption('Battleship')
-    size = width, height = 900, 750
+    info_object = pygame.display.Info()
+    size = width, height = info_object.current_w, info_object.current_h
     center_w, center_h = width // 2, height // 2
-    screen = pygame.display.set_mode(size)
+    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
     player_board = Board(10, 10)
-    player_board.set_view(200, 150, 50)
     # fps
     fps = 60
     clock = pygame.time.Clock()
@@ -735,9 +750,7 @@ if __name__ == "__main__":
     while running:
         if menu:
             # MENU STAGE
-            size = width, height = 900, 750
-            screen = pygame.display.set_mode(size)
-            player_board.set_view(200, 150, 50)
+            screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
             # btns
             play_btn = Button((center_w - 100, center_h + 50), (200, 10), "Play")
             exit_btn = Button((center_w - 100, center_h + 150), (200, 10), "Exit")
@@ -784,17 +797,24 @@ if __name__ == "__main__":
             # start game flag
             battle_begins_table_need = False
 
+            player_board = Board(10, 10)
+            player_board.set_view(center_w, center_h, 55, central=True)
             # choose ship buttons creating
             choose_ship_btns = list()
+            # size of board and btns
+            board_cell_size = player_board.get_cell_size()
+            board_w = player_board.get_size()[0]
+            cur_btns_w = board_w * board_cell_size // 4
             for i in range(1, 5):
                 choose_ship_btns.append(
-                    ChooseShipButton((player_board.left + (i - 1) * 125,
+                    ChooseShipButton((player_board.left + (i - 1) * cur_btns_w,
                                       player_board.top +
-                                      player_board.cell_size * 10 + 15),
-                                     (125, 80), f'x{i}'))
+                                      board_cell_size * board_w + 15),
+                                     (cur_btns_w, 80), f'x{i}'))
             # randomly fill button creating
-            randomly_fill_btn = RandomlyFillButton((center_w - 127, 30), (100, 50),
+            randomly_fill_btn = RandomlyFillButton((center_w, 60), (cur_btns_w * 2, 50),
                                                    'fill it randomly', player_board)
+            randomly_fill_btn.head_is_center(True)
 
             # placing ships stage loop
             while ship_placement_stage:
@@ -868,7 +888,7 @@ if __name__ == "__main__":
                 # battle begins table delete
                 if battle_begins_table_need:
                     battle_begins_table_need = False
-                    pygame.time.wait(3000)
+                    pygame.time.wait(2000)
 
                 # delay for constant fps
                 clock.tick(fps)
@@ -881,13 +901,12 @@ if __name__ == "__main__":
             # player board
             player_lose = False
             bot_lose = False
-            size = width, height = 920, 700
-            screen = pygame.display.set_mode(size)
-            player_board.set_view(40, 150, 40)
+            screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            player_board.set_view(center_w // 2, center_h, 60, central=True)
             # bot settings
             bot = Bot()
             bot_board = Board(player_board.width, player_board.height)
-            bot_board.set_view(500, 150, 40)
+            bot_board.set_view(3 * center_w // 2, center_h, 60, central=True)
             bot_board.set_board_of_bot_status(True)
             bot_board.randomly_fill()
             # order
@@ -958,7 +977,7 @@ if __name__ == "__main__":
             player_board.render()
             bot_board.render()
             game_over_table_render(player_lose, bot_lose)
-            running = False
+            menu = True
 
     # game ending
     pygame.quit()
