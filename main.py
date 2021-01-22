@@ -467,6 +467,7 @@ class CrossExitButton(Button):
         self.set_head_pos((self.head[0], self.head[1] - 40))
         self.should_move = False
         self.should_move_down = False
+        self.real_head_y = float(self.head_y)
 
     def is_rect_focused(self, cur_pos):
         return 0 < cur_pos[0] - self.head_x + 70 < self.width + 70 \
@@ -474,11 +475,14 @@ class CrossExitButton(Button):
 
     def move(self):
         if self.should_move:
+            global fps
             if self.should_move_down:
-                self.set_head_pos((self.head_x, self.head_y + 2))
+                self.real_head_y += 60 / fps
+                self.set_head_pos((self.head_x, int(self.real_head_y)))
             else:
-                self.set_head_pos((self.head_x, self.head_y - 2))
-            if self.head_y == 0 or self.head_y == -40:
+                self.real_head_y -= 60 / fps
+                self.set_head_pos((self.head_x, int(self.real_head_y)))
+            if self.head_y >= 0 or self.head_y <= -40:
                 self.should_move = False
 
     def get_motion(self, cur_pos):
@@ -991,9 +995,6 @@ if __name__ == "__main__":
                 battle_begins_table_need = False
                 cur_delay = 2000
 
-            # delay for constant fps
-            clock.tick(fps)
-
             if not ship_placement_stage.get_active() and not menu.get_active():
                 game.set_active(True)
 
@@ -1068,9 +1069,6 @@ if __name__ == "__main__":
             # render order table
             order_table_render(player_order)
 
-            # delay for constant fps
-            clock.tick(fps)
-
             if not game.get_active():
                 # boards
                 # screen updating
@@ -1079,6 +1077,8 @@ if __name__ == "__main__":
                 bot_board.render()
                 game_over_table_render(player_lose, bot_lose)
 
+        # delay for constant fps
+        clock.tick(fps)
         # screen flip
         pygame.display.flip()
 
