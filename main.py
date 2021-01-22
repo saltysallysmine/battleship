@@ -383,6 +383,9 @@ class Button:
         self.height = max(self.height, text_rect.size[1] + 20)
         self.size = (self.width, self.height)
 
+    def set_head_pos(self, head):
+        self.head = self.head_x, self.head_y = head
+
     def head_is_center(self, hd_is_cen=True):
         if hd_is_cen:
             self.head_x -= self.width // 2
@@ -456,6 +459,48 @@ class RandomlyFillButton(Button):
             battle_begins_table_need = True
             global choose_ship_btns
             choose_ship_btns.clear()
+
+
+class CrossExitButton(Button):
+    def __init__(self, head, btn_size, text):
+        super().__init__(head, btn_size, text)
+        self.set_head_pos((self.head[0], self.head[1] - 40))
+        self.should_move = False
+        self.should_move_down = False
+
+    def is_rect_focused(self, cur_pos):
+        return 0 < cur_pos[0] - self.head_x + 70 < self.width + 70 \
+               and -10 < cur_pos[1] < 70
+
+    def move(self):
+        if self.should_move:
+            if self.should_move_down:
+                self.set_head_pos((self.head_x, self.head_y + 2))
+            else:
+                self.set_head_pos((self.head_x, self.head_y - 2))
+            if self.head_y == 0 or self.head_y == -40:
+                self.should_move = False
+
+    def get_motion(self, cur_pos):
+        if self.is_active:
+            # determine where should we move
+            if self.is_rect_focused(cur_pos):
+                if self.head_y == 0:
+                    self.should_move = False
+                else:
+                    self.should_move = True
+                    self.should_move_down = True
+            else:
+                if self.head_y == -40:
+                    self.should_move = False
+                else:
+                    self.should_move = True
+                    self.should_move_down = False
+            # focusing btn
+            if self.is_focused(cur_pos):
+                self.btn_color = FOCUSED_BUTTON_COLOR
+            else:
+                self.btn_color = BUTTON_COLOR
 
 
 class Board:
@@ -705,7 +750,7 @@ class Bot:
             global player_order
             player_order = True
 
-        pygame.time.wait(700)
+        cur_delay = 700
 
 
 def battle_begins_table_render():
@@ -756,7 +801,8 @@ def game_over_table_render(pl_lose, bt_lose):
     # screen flip
     pygame.display.flip()
     # wait
-    pygame.time.wait(2000)
+    global cur_delay
+    cur_delay = 2000
 
 
 def terminate():
@@ -781,7 +827,10 @@ if __name__ == "__main__":
     ship_placement_stage = Stage(False)
     game = Stage(False)
 
-    # smth for menu
+    # SMTH
+    # for main
+    x_exit_btn = CrossExitButton((width - 100, 0), (100, 30), 'X')
+    # for menu
     play_btn = None
     exit_btn = None
     menu_btns = None
@@ -794,6 +843,20 @@ if __name__ == "__main__":
     bot = None
 
     while running:
+        event_list = pygame.event.get()
+        cur_delay = 0
+        # screen updating
+        screen.fill(BACKGROUND_COLOR)
+        # cross exit button
+        for event in event_list:
+            if event.type == pygame.MOUSEMOTION:
+                x_exit_btn.get_motion(event.pos)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if x_exit_btn.is_button_pushed(event.pos):
+                    terminate()
+        x_exit_btn.move()
+        x_exit_btn.btn_render()
+
         if menu.is_preparing():
             # MENU STAGE
             screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -808,9 +871,9 @@ if __name__ == "__main__":
 
             menu.prepared()
 
-        if menu.is_main_part():
+        elif menu.is_main_part():
             # checking events
-            for event in pygame.event.get():
+            for event in event_list:
                 if event.type == pygame.QUIT:
                     terminate()
 
@@ -829,17 +892,13 @@ if __name__ == "__main__":
                     for btn in menu_btns:
                         btn.button_unpushed(event.pos)
 
-            # screen updating
-            screen.fill(BACKGROUND_COLOR)
             # title
             screen.blit(title_text, title_text_rect)
             # btn
             for btn in menu_btns:
                 btn.btn_render()
-            # screen flip
-            pygame.display.flip()
 
-        if ship_placement_stage.is_preparing():
+        elif ship_placement_stage.is_preparing():
             # SHIP PLACEMENT STAGE
 
             # start game flag
@@ -867,9 +926,9 @@ if __name__ == "__main__":
             ship_placement_stage.prepared()
 
         # placing ships stage loop
-        if ship_placement_stage.is_main_part():
+        elif ship_placement_stage.is_main_part():
             # checking events
-            for event in pygame.event.get():
+            for event in event_list:
                 if event.type == pygame.QUIT:
                     terminate()
 
@@ -918,8 +977,6 @@ if __name__ == "__main__":
                         game.set_active(False)
                         menu.set_active(True)
 
-            # screen updating
-            screen.fill(BACKGROUND_COLOR)
             # boards ands btns
             for btn in choose_ship_btns:
                 btn.btn_render()
@@ -929,13 +986,10 @@ if __name__ == "__main__":
             if battle_begins_table_need:
                 battle_begins_table_render()
 
-            # screen flip
-            pygame.display.flip()
-
             # battle begins table delete
             if battle_begins_table_need:
                 battle_begins_table_need = False
-                pygame.time.wait(2000)
+                cur_delay = 2000
 
             # delay for constant fps
             clock.tick(fps)
@@ -943,7 +997,7 @@ if __name__ == "__main__":
             if not ship_placement_stage.get_active() and not menu.get_active():
                 game.set_active(True)
 
-        if game.is_preparing():
+        elif game.is_preparing():
             # GAME STAGE
 
             # player board
@@ -964,8 +1018,8 @@ if __name__ == "__main__":
             game.prepared()
 
         # game loop
-        if game.is_main_part():
-            for event in pygame.event.get():
+        elif game.is_main_part():
+            for event in event_list:
                 if event.type == pygame.QUIT:
                     terminate()
 
@@ -991,8 +1045,6 @@ if __name__ == "__main__":
                 player_fired = True
                 bot.bot_attack(player_board)
 
-            # screen updating
-            screen.fill(BACKGROUND_COLOR)
             # boards
             player_board.render()
             bot_board.render()
@@ -1016,8 +1068,6 @@ if __name__ == "__main__":
             # render order table
             order_table_render(player_order)
 
-            # screen flip
-            pygame.display.flip()
             # delay for constant fps
             clock.tick(fps)
 
@@ -1028,6 +1078,12 @@ if __name__ == "__main__":
                 player_board.render()
                 bot_board.render()
                 game_over_table_render(player_lose, bot_lose)
+
+        # screen flip
+        pygame.display.flip()
+
+        if cur_delay:
+            pygame.time.wait(cur_delay)
 
     # game ending
     pygame.quit()
