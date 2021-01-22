@@ -705,10 +705,11 @@ class Board:
                     player_fired = True
             # shoot to empty cell
             else:
-                self.board[cell[0]][cell[1]].set_shooted()
-                self.shooted.append(cell)
-                player_order = not player_order
-                player_fired = True
+                if cell not in self.shooted:
+                    self.board[cell[0]][cell[1]].set_shooted()
+                    self.shooted.append(cell)
+                    player_order = not player_order
+                    player_fired = True
 
     def set_board_of_bot_status(self, status):
         self.board_of_bot = status
@@ -753,7 +754,7 @@ class Bot:
         if not cur_board.is_attacked(attacked):
             global player_order
             player_order = True
-
+        global cur_delay
         cur_delay = 700
 
 
@@ -889,6 +890,7 @@ if __name__ == "__main__":
                     if play_btn.is_button_pushed(event.pos):
                         menu.set_active(False)
                         ship_placement_stage.set_active(True)
+                        cur_delay = 200
                     if exit_btn.is_button_pushed(event.pos):
                         terminate()
 
@@ -1004,7 +1006,6 @@ if __name__ == "__main__":
             # player board
             player_lose = False
             bot_lose = False
-            screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
             player_board.set_view(center_w // 2, center_h, 60, central=True)
             # bot settings
             bot = Bot()
@@ -1015,11 +1016,13 @@ if __name__ == "__main__":
             # order
             player_order = True
             player_fired = False
+            bot_fired = False
 
             game.prepared()
 
         # game loop
         elif game.is_main_part():
+            bot_fired = False
             for event in event_list:
                 if event.type == pygame.QUIT:
                     terminate()
@@ -1045,6 +1048,7 @@ if __name__ == "__main__":
                 # bot attack
                 player_fired = True
                 bot.bot_attack(player_board)
+                bot_fired = True
 
             # boards
             player_board.render()
@@ -1058,16 +1062,21 @@ if __name__ == "__main__":
             for ship in player_board.ships:
                 if ship.alive:
                     player_lose = False
+                    break
             for ship in bot_board.ships:
                 if ship.alive:
                     bot_lose = False
+                    break
 
             if player_lose or bot_lose:
                 game.set_active(False)
                 menu.set_active(True)
 
-            # render order table
-            order_table_render(player_order)
+            if not bot_fired:
+                # render order table
+                order_table_render(player_order)
+            else:
+                order_table_render(False)
 
             if not game.get_active():
                 # boards
