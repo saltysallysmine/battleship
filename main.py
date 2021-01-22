@@ -16,6 +16,40 @@ PUSHED_BUTTON_COLOR = (181, 101, 167)
 SHOOTED_CELL_COLOR = BUTTON_COLOR
 
 
+class Stage:
+    def __init__(self, active):
+        self.active = active
+        self.preparing = False
+        self.main_part = False
+        self.set_active(self.active)
+
+    def is_preparing(self):
+        return self.preparing
+
+    def is_main_part(self):
+        return self.main_part
+
+    def get_active(self):
+        self.active = self.preparing or self.main_part
+        return self.active
+
+    def set_active(self, active):
+        self.active = active
+        if self.active:
+            self.preparing = True
+        else:
+            self.preparing = False
+        self.main_part = False
+
+    def prepared(self):
+        if self.active:
+            self.preparing = False
+            self.main_part = True
+
+    def __str__(self):
+        return f'active: {self.active}, preparing: {self.preparing}, main_part: {self.main_part}'
+
+
 class BoardCell:
     def __init__(self, color):
         # the current color of the cell
@@ -418,7 +452,7 @@ class RandomlyFillButton(Button):
             self.parent_board.randomly_fill()
             # game status
             global ship_placement_stage, battle_begins_table_need
-            ship_placement_stage = False
+            ship_placement_stage.set_active(False)
             battle_begins_table_need = True
             global choose_ship_btns
             choose_ship_btns.clear()
@@ -480,7 +514,7 @@ class Board:
         if not self.need_to_place_ships:
             # game status
             global ship_placement_stage, battle_begins_table_need
-            ship_placement_stage = False
+            ship_placement_stage.set_active(False)
             battle_begins_table_need = True
             # btn delete
             global choose_ship_btns
@@ -515,7 +549,7 @@ class Board:
 
     # board render
     def render(self):
-        if ship_placement_stage:
+        if ship_placement_stage.get_active():
             if self.placing_ship:
                 self.board = list()
                 self.board_filling()
@@ -743,12 +777,24 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
 
     running = True
-    menu = True
-    ship_placement_stage = False
-    game = False
+    menu = Stage(True)
+    ship_placement_stage = Stage(False)
+    game = Stage(False)
+
+    # smth for menu
+    play_btn = None
+    exit_btn = None
+    menu_btns = None
+    title_text = None
+    title_text_rect = None
+    # for ship_placement_stage
+    randomly_fill_btn = None
+    # for game
+    bot_board = None
+    bot = None
 
     while running:
-        if menu:
+        if menu.is_preparing():
             # MENU STAGE
             screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
             # btns
@@ -760,38 +806,40 @@ if __name__ == "__main__":
             title_text = font.render('Battleship', True, pygame.Color(SHIP_COLOR))
             title_text_rect = title_text.get_rect(center=(center_w, center_h - 150))
 
-            while menu:
-                # checking events
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
+            menu.prepared()
+
+        if menu.is_main_part():
+            # checking events
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    terminate()
+
+                if event.type == pygame.MOUSEMOTION:
+                    for btn in menu_btns:
+                        btn.get_motion(event.pos)
+
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if play_btn.is_button_pushed(event.pos):
+                        menu.set_active(False)
+                        ship_placement_stage.set_active(True)
+                    if exit_btn.is_button_pushed(event.pos):
                         terminate()
 
-                    if event.type == pygame.MOUSEMOTION:
-                        for btn in menu_btns:
-                            btn.get_motion(event.pos)
+                if event.type == pygame.MOUSEBUTTONUP:
+                    for btn in menu_btns:
+                        btn.button_unpushed(event.pos)
 
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        if play_btn.is_button_pushed(event.pos):
-                            menu = False
-                            ship_placement_stage = True
-                        if exit_btn.is_button_pushed(event.pos):
-                            terminate()
+            # screen updating
+            screen.fill(BACKGROUND_COLOR)
+            # title
+            screen.blit(title_text, title_text_rect)
+            # btn
+            for btn in menu_btns:
+                btn.btn_render()
+            # screen flip
+            pygame.display.flip()
 
-                    if event.type == pygame.MOUSEBUTTONUP:
-                        for btn in menu_btns:
-                            btn.button_unpushed(event.pos)
-
-                # screen updating
-                screen.fill(BACKGROUND_COLOR)
-                # title
-                screen.blit(title_text, title_text_rect)
-                # btn
-                for btn in menu_btns:
-                    btn.btn_render()
-                # screen flip
-                pygame.display.flip()
-
-        if ship_placement_stage:
+        if ship_placement_stage.is_preparing():
             # SHIP PLACEMENT STAGE
 
             # start game flag
@@ -816,86 +864,86 @@ if __name__ == "__main__":
                                                    'fill it randomly', player_board)
             randomly_fill_btn.head_is_center(True)
 
-            # placing ships stage loop
-            while ship_placement_stage:
-                # checking events
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        ship_placement_stage = False
-                        game = False
-                        terminate()
+            ship_placement_stage.prepared()
 
-                    if event.type == pygame.MOUSEMOTION:
-                        # choose btns
-                        for btn in choose_ship_btns:
-                            btn.get_motion(event.pos)
-                        player_board.get_move(event.pos)
-                        # randomly fill btn
-                        randomly_fill_btn.get_motion(event.pos)
-                        # board cells highlighting
-                        player_board.cell_highlighting(event.pos)
+        # placing ships stage loop
+        if ship_placement_stage.is_main_part():
+            # checking events
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    terminate()
 
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        # choose btns
-                        if ship_placement_stage:
-                            for el in choose_ship_btns:
-                                el.button_pushed(event.pos, player_board)
-                        # randomly fill btn
-                        randomly_fill_btn.button_pushed(event.pos)
-                        # player_board.get_click(event.pos)
+                if event.type == pygame.MOUSEMOTION:
+                    # choose btns
+                    for btn in choose_ship_btns:
+                        btn.get_motion(event.pos)
+                    player_board.get_move(event.pos)
+                    # randomly fill btn
+                    randomly_fill_btn.get_motion(event.pos)
+                    # board cells highlighting
+                    player_board.cell_highlighting(event.pos)
 
-                    if event.type == pygame.MOUSEBUTTONUP:
-                        # choose btns
-                        if ship_placement_stage:
-                            for el in choose_ship_btns:
-                                el.button_unpushed(event.pos)
-                        # randomly fill btn
-                        randomly_fill_btn.button_unpushed(event.pos)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    # choose btns
+                    if ship_placement_stage.get_active():
+                        for el in choose_ship_btns:
+                            el.button_pushed(event.pos, player_board)
+                    # randomly fill btn
+                    randomly_fill_btn.button_pushed(event.pos)
+                    # player_board.get_click(event.pos)
 
-                    if event.type == pygame.KEYDOWN:
-                        if player_board.placing_ship:
-                            # space pressing
-                            if event.key == pygame.K_SPACE:
-                                player_board.ships[-1].change_horizontal(player_board)
-                            # enter pressing
-                            if event.key == 13:
-                                if player_board.ships[-1].place_is_ok(player_board):
-                                    player_board.placing_ship = False
-                                    player_board.reduce_required_number_of_ships()
-                                    # if at least one ship placed
-                                    randomly_fill_btn.set_active(False)
+                if event.type == pygame.MOUSEBUTTONUP:
+                    # choose btns
+                    if ship_placement_stage.get_active():
+                        for el in choose_ship_btns:
+                            el.button_unpushed(event.pos)
+                    # randomly fill btn
+                    randomly_fill_btn.button_unpushed(event.pos)
 
-                        if event.key == pygame.K_ESCAPE:
-                            ship_placement_stage = False
-                            game = False
-                            menu = True
-                            break
+                if event.type == pygame.KEYDOWN:
+                    if player_board.placing_ship:
+                        # space pressing
+                        if event.key == pygame.K_SPACE:
+                            player_board.ships[-1].change_horizontal(player_board)
+                        # enter pressing
+                        if event.key == 13:
+                            if player_board.ships[-1].place_is_ok(player_board):
+                                player_board.placing_ship = False
+                                player_board.reduce_required_number_of_ships()
+                                # if at least one ship placed
+                                randomly_fill_btn.set_active(False)
 
-                # screen updating
-                screen.fill(BACKGROUND_COLOR)
-                # boards ands btns
-                for btn in choose_ship_btns:
-                    btn.btn_render()
-                randomly_fill_btn.btn_render()
-                player_board.render()
-                # battle begins table
-                if battle_begins_table_need:
-                    battle_begins_table_render()
+                    if event.key == pygame.K_ESCAPE:
+                        ship_placement_stage.set_active(False)
+                        game.set_active(False)
+                        menu.set_active(True)
 
-                # screen flip
-                pygame.display.flip()
+            # screen updating
+            screen.fill(BACKGROUND_COLOR)
+            # boards ands btns
+            for btn in choose_ship_btns:
+                btn.btn_render()
+            randomly_fill_btn.btn_render()
+            player_board.render()
+            # battle begins table
+            if battle_begins_table_need:
+                battle_begins_table_render()
 
-                # battle begins table delete
-                if battle_begins_table_need:
-                    battle_begins_table_need = False
-                    pygame.time.wait(2000)
+            # screen flip
+            pygame.display.flip()
 
-                # delay for constant fps
-                clock.tick(fps)
-            if not menu:
-                game = True
+            # battle begins table delete
+            if battle_begins_table_need:
+                battle_begins_table_need = False
+                pygame.time.wait(2000)
 
-        if game:
+            # delay for constant fps
+            clock.tick(fps)
+
+            if not ship_placement_stage.get_active() and not menu.get_active():
+                game.set_active(True)
+
+        if game.is_preparing():
             # GAME STAGE
 
             # player board
@@ -913,71 +961,73 @@ if __name__ == "__main__":
             player_order = True
             player_fired = False
 
-            # game loop
-            while game:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        game = False
-                        terminate()
+            game.prepared()
 
-                    if event.type == pygame.MOUSEMOTION:
-                        # board cells highlighting
-                        player_board.cell_highlighting(event.pos)
-                        bot_board.cell_highlighting(event.pos)
+        # game loop
+        if game.is_main_part():
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    terminate()
 
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        if player_order:
-                            player_fired = False
-                            bot_board.get_attack(event.pos)
+                if event.type == pygame.MOUSEMOTION:
+                    # board cells highlighting
+                    player_board.cell_highlighting(event.pos)
+                    bot_board.cell_highlighting(event.pos)
 
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            ship_placement_stage = False
-                            game = False
-                            menu = True
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if player_order:
+                        player_fired = False
+                        bot_board.get_attack(event.pos)
 
-                # bot order
-                if not player_order and not player_fired:
-                    # bot attack
-                    player_fired = True
-                    bot.bot_attack(player_board)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        ship_placement_stage.set_active(False)
+                        game.set_active(False)
+                        menu.set_active(True)
 
-                # screen updating
-                screen.fill(BACKGROUND_COLOR)
-                # boards
-                player_board.render()
-                bot_board.render()
-                # player fired
-                player_fired = False
+            # bot order
+            if not player_order and not player_fired:
+                # bot attack
+                player_fired = True
+                bot.bot_attack(player_board)
 
-                # game over finding
-                player_lose = True
-                bot_lose = True
-                for ship in player_board.ships:
-                    if ship.alive:
-                        player_lose = False
-                for ship in bot_board.ships:
-                    if ship.alive:
-                        bot_lose = False
-
-                if player_lose or bot_lose:
-                    game = False
-
-                # render order table
-                order_table_render(player_order)
-
-                # screen flip
-                pygame.display.flip()
-                # delay for constant fps
-                clock.tick(fps)
-
-            # boards
             # screen updating
             screen.fill(BACKGROUND_COLOR)
+            # boards
             player_board.render()
             bot_board.render()
-            game_over_table_render(player_lose, bot_lose)
-            menu = True
+            # player fired
+            player_fired = False
+
+            # game over finding
+            player_lose = True
+            bot_lose = True
+            for ship in player_board.ships:
+                if ship.alive:
+                    player_lose = False
+            for ship in bot_board.ships:
+                if ship.alive:
+                    bot_lose = False
+
+            if player_lose or bot_lose:
+                game.set_active(False)
+                menu.set_active(True)
+
+            # render order table
+            order_table_render(player_order)
+
+            # screen flip
+            pygame.display.flip()
+            # delay for constant fps
+            clock.tick(fps)
+
+            if not game.get_active():
+                # boards
+                # screen updating
+                screen.fill(BACKGROUND_COLOR)
+                player_board.render()
+                bot_board.render()
+                game_over_table_render(player_lose, bot_lose)
 
     # game ending
     pygame.quit()
